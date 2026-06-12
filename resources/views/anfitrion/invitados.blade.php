@@ -264,18 +264,51 @@
         }
     </script>
 
- 
+ <style>
+    /* Evita de forma definitiva que aparezca la barra horizontal */
+    body {
+        overflow-x: hidden !important;
+    }
+
+    /* Animación fluida para que los globos suban */
+    .globo-animado {
+        animation: subirGlobos linear forwards;
+        pointer-events: none; /* Evita que el usuario haga clic en los globos por accidente */
+    }
+
+    /* El motor de la animación: Desde abajo de la pantalla hasta arriba */
+    @keyframes subirGlobos {
+        0% {
+            transform: translateY(100vh) rotate(0deg);
+            opacity: 1;
+        }
+        100% {
+            transform: translateY(-110vh) rotate(20deg);
+            opacity: 0;
+        }
+    }
+</style>
+
 <script>
     // Función para animar los globos
     function lanzarGlobos() {
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 15; i++) { 
             const globo = document.createElement('div');
             globo.classList.add('globo-animado');
             globo.innerHTML = '🎈';
-            globo.style.left = Math.random() * 100 + 'vw';
-            globo.style.animationDuration = (2 + Math.random() * 3) + 's';
+            
+            // 🎯 Forzamos que se queden fijos en una capa superior sin romper el diseño
+            globo.style.position = 'fixed';
+            globo.style.bottom = '-50px';
+            globo.style.zIndex = '9999';
+            globo.style.fontSize = (24 + Math.random() * 20) + 'px'; // Tamaños variados muy lindos
+            
+            // 🛑 Restringimos el ancho para que no toquen el borde derecho (máximo 90vw)
+            globo.style.left = (5 + Math.random() * 85) + 'vw';
+            globo.style.animationDuration = (3 + Math.random() * 3) + 's';
+            
             document.body.appendChild(globo);
-            setTimeout(() => globo.remove(), 5000);
+            setTimeout(() => globo.remove(), 6000);
         }
     }
 

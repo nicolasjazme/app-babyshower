@@ -60,21 +60,38 @@ class AuthController extends Controller
 
         if ($response->successful()) {
             $usuario = $response->json('usuario');
-            $token = $response->json('token'); // <--- CAPTURAMOS EL TOKEN
+            $token = $response->json('token'); 
 
             // Guardamos todo en la sesión
             Session::put('usuario_logueado', $usuario);
-            Session::put('token_jwt', $token); // <--- GUARDAMOS EL TOKEN PARA DESPUÉS
+            Session::put('token_jwt', $token); 
 
-            if (isset($usuario['rol']) && $usuario['rol'] === 'administrador') {
-                return redirect('/admin')->with('success', '¡Bienvenido, Administrador!');
+            // 🚪 ENRUTAMIENTO POR ROLES (¡Adiós al efecto rebote!)
+            if (isset($usuario['rol'])) {
+                
+                if ($usuario['rol'] === 'administrador') {
+                    // El admin va a su panel
+                    return redirect('/admin')->with('success', '¡Bienvenido, Administrador!');
+                } 
+                elseif ($usuario['rol'] === 'organizador') {
+                    // El organizador va a su panel (basado en tu código original)
+                    return redirect('/anfitrion')->with('success', '¡Bienvenido de vuelta!');
+                } 
+                else {
+                    // CUALQUIER OTRO (Invitados) va a welcome.blade.php (Ruta '/')
+                    return redirect('/')->with('success', '¡Bienvenido al Baby Shower!');
+                }
             }
-            return redirect('/anfitrion')->with('success', '¡Bienvenido de vuelta!');
+
+            // Por si acaso algún usuario antiguo no tiene el campo rol
+            return redirect('/')->with('success', '¡Bienvenido!');
+
         } else {
             $mensajeError = $response->json('mensaje') ?? 'Correo o contraseña incorrectos.';
             return back()->with('error', $mensajeError);
         }
     }
+    
 
     public function logout()
     {
