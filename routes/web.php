@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Session;
-use App\Http\Controllers\BabyShowerController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\EventController;
@@ -11,86 +10,100 @@ use App\Http\Controllers\InvitacionController;
 
 /*
 |--------------------------------------------------------------------------
-| Web Routes
+| Web Routes - Invita App Multi-Evento
 |--------------------------------------------------------------------------
 */
 
 // ==========================================================================
 // 1. RUTAS PÚBLICAS (Acceso Libre Global - No requieren estar logueado)
 // ==========================================================================
-Route::get('/', [BabyShowerController::class, 'index'])->name('home');
-Route::get('/baby-shower', [BabyShowerController::class, 'index']);
+
+// Landing Page General con el catálogo de temas (Baby shower, asado, cumpleaños, etc.)
+Route::get('/', [EventController::class, 'index'])->name('home');
+
+// Recuperación de Contraseñas
 Route::get('/recuperar-contrasena', [AuthController::class, 'showRecuperarForm']);
 Route::post('/recuperar-contrasena', [AuthController::class, 'recuperarPassword']);
 
 // Autenticación de Usuarios (Anfitriones y Administradores)
-Route::get('/registro', [AuthController::class, 'showRegisterForm']);
-Route::post('/registro', [AuthController::class, 'register']);
-Route::get('/login', [AuthController::class, 'showLoginForm']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::get('/registro', [AuthController::class, 'showRegisterForm'])->name('register');
+Route::post('/registro', [AuthController::class, 'register'])->name('register.submit');
+Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
 
-// RF-11: Enlace único público para invitados
+// Enlaces Únicos Dinámicos para Invitados (Mapeados por el Slug del Evento)
 Route::get('/e/{slug}', [EventController::class, 'showPublic'])->name('event.public');
 Route::post('/asistencia/registrar', [HostController::class, 'registrarAsistencia'])->name('asistencia.store');
-Route::get('/regalos', [BabyShowerController::class, 'index'])->name('regalos.index');
 
-// Ruta mágica para invitados (SIN LOGIN)
+// Invitación mágica sin credenciales
 Route::get('/invitacion/{token}', [InvitacionController::class, 'mostrarInvitacion'])->name('invitacion.magica');
 
-// 🔥 Endpoint de Sincronización PÚBLICO (Para que Node pueda avisar libremente)
+// Endpoint de Sincronización PÚBLICO para WebSockets / Webhooks de Node.js
 Route::post('/api/sincronizar-estado', [HostController::class, 'sincronizarDesdeNode']);
 
+
 // ==========================================================================
-// 2. RUTAS PROTEGIDAS (Requieren Sesión Iniciada y pasar por el Middleware)
+// 2. RUTAS PROTEGIDAS (Requieren Sesión Iniciada via auth.custom)
 // ==========================================================================
 Route::middleware(['auth.custom'])->group(function () {
     
-    // --- Cuenta y Perfil ---
+    // --- Cuenta, Cierre de Sesión y Perfil General ---
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/perfil', [AuthController::class, 'editProfile'])->name('profile.edit');
     Route::put('/perfil', [AuthController::class, 'updateProfile'])->name('profile.update');
-    // Ruta para procesar el cambio de contraseña
     Route::post('/perfil/cambiar-contrasena', [AuthController::class, 'actualizarPassword'])->name('perfil.password.update');
-    Route::get('/perfil', function () {
-    return view('profile.edit'); // O la ruta donde tengas guardado tu edit.blade.php
-});
 
-    // 🔥 Interacción de Invitados protegida (Pide Login para reservar)
-    Route::post('/reservar-regalo', [BabyShowerController::class, 'reserve'])->name('gifts.reserve');
+    // --- Módulo General de Interacción Interactiva (Regalos, Cooperación, Tablas) ---
+    Route::post('/eventos/reservar-item', [EventController::class, 'reserveItem'])->name('items.reserve');
 
-
-    // --- 🍼 PANEL EXCLUSIVO DEL ANFITRIÓN (RF-13 y RF-14) ---
-    Route::get('/anfitrion', [HostController::class, 'index'])->name('anfitrion.index');
-    Route::get('/baby-shower/nuevo', [EventController::class, 'create'])->name('event.create');
-    Route::post('/baby-shower/nuevo', [EventController::class, 'store'])->name('event.store');
-    Route::get('/baby-shower/{id}/editar', [EventController::class, 'edit'])->name('event.edit');
-    Route::put('/baby-shower/{id}', [EventController::class, 'update'])->name('event.update');
-
-    // --- 🖥️ PANEL EXCLUSIVO DEL ADMINISTRADOR ---
-    Route::get('/admin', [AdminController::class, 'index'])->name('admin.index');
-    Route::get('/admin/baby-showers', [AdminController::class, 'listBabyShowers'])->name('admin.babyshowers.list');
-    Route::post('/admin/baby-showers/{id}/estado', [AdminController::class, 'updateStatus'])->name('admin.babyshowers.status');
-
-    // --- ACCIONES COMPARTIDAS DE REGALOS (Admin y Anfitrión) ---
-    Route::post('/admin/regalos', [AdminController::class, 'store'])->name('gifts.store');
-    Route::post('/admin/regalos/liberar/{id}', [AdminController::class, 'restore'])->name('gifts.restore');
-    Route::delete('/admin/regalos/{id}', [AdminController::class, 'destroy'])->name('gifts.destroy');
-    Route::put('/admin/regalos/{id}', [AdminController::class, 'update'])->name('admin.regalos.update');
 
     // ========================================================
-    // 👥 GESTIÓN DE INVITADOS DEL ANFITRIÓN (Módulo Interno Privado)
+    // 🍼 MÓDULO ANFITRIÓN: CONTROL DE SUS EVENTOS PROPIOS
     // ========================================================
-    Route::get('/anfitrion/invitados', [HostController::class, 'invitadosIndex'])->name('hosts.guests.index');
-    Route::post('/anfitrion/invitados', [HostController::class, 'invitadosStore'])->name('hosts.guests.store');
-    Route::put('/anfitrion/invitados/{id}', [HostController::class, 'invitadosUpdate'])->name('hosts.guests.update');
-    Route::delete('/anfitrion/invitados/{id}', [HostController::class, 'invitadosDestroy'])->name('hosts.guests.destroy');
-    Route::post('/anfitrion/invitados/importar', [HostController::class, 'invitadosImport'])->name('hosts.guests.import');
-    Route::post('/anfitrion/invitados/recordatorio', [HostController::class, 'enviarRecordatorioMasivo'])->name('hosts.invitados.remind');
+    Route::prefix('anfitrion')->name('anfitrion.')->group(function () {
+        // Dashboard principal del organizador
+        Route::get('/', [HostController::class, 'index'])->name('index');
+        
+        // CRUD de Eventos Dinámicos (Creación según la plantilla elegida)
+        Route::get('/eventos/nuevo', [EventController::class, 'create'])->name('event.create');
+        Route::post('/eventos/nuevo', [EventController::class, 'store'])->name('event.store');
+        Route::get('/eventos/{id}/editar', [EventController::class, 'edit'])->name('event.edit');
+        Route::put('/eventos/{id}', [EventController::class, 'update'])->name('event.update');
 
-    // --- LOGÍSTICA EXCLUSIVA Y SOPORTE ---
-    Route::post('/anfitrion/regalos/{id}/liberar', [HostController::class, 'liberarRegalo'])->name('hosts.gifts.restore');
-    Route::post('/admin/regalos/{id}/liberar-reserva', [AdminController::class, 'liberarRegalo'])->name('admin.regalos.liberar_reserva');
-    Route::post('/anfitrion/incidencias', [HostController::class, 'enviarIncidencia'])->name('incidencias.store');
-    Route::post('/admin/incidencias/{id}/completar', [AdminController::class, 'completarIncidencia'])->name('incidencias.complete');
+        // Gestión de Invitados y Envío de Recordatorios por Evento
+        Route::get('/invitados', [HostController::class, 'invitadosIndex'])->name('guests.index');
+        Route::post('/invitados', [HostController::class, 'invitadosStore'])->name('guests.store');
+        Route::put('/invitados/{id}', [HostController::class, 'invitadosUpdate'])->name('guests.update');
+        Route::delete('/invitados/{id}', [HostController::class, 'invitadosDestroy'])->name('guests.destroy');
+        Route::post('/invitados/importar', [HostController::class, 'invitadosImport'])->name('guests.import');
+        Route::post('/invitados/recordatorio', [HostController::class, 'enviarRecordatorioMasivo'])->name('invitados.remind');
+
+        // Logística e Incidencias del Anfitrión
+        Route::post('/items/{id}/liberar', [HostController::class, 'liberarItem'])->name('items.restore');
+        Route::post('/incidencias', [HostController::class, 'enviarIncidencia'])->name('incidencias.store');
+    });
+
+
+    // ========================================================
+    // 🖥️ MÓDULO ADMINISTRADOR: SUPERVISIÓN GLOBAL DE INVITA APP
+    // ========================================================
+    Route::prefix('admin')->name('admin.')->group(function () {
+        // Panel base de métricas globales
+        Route::get('/', [AdminController::class, 'index'])->name('index');
+        
+        // Control de cuentas y eventos creados en la plataforma
+        Route::get('/eventos', [AdminController::class, 'listEvents'])->name('events.list');
+        Route::post('/eventos/{id}/estado', [AdminController::class, 'updateStatus'])->name('events.status');
+
+        // CRUD Global de Artículos / Requerimientos de Plantillas (Regalos o Insumos base)
+        Route::post('/items', [AdminController::class, 'store'])->name('items.store');
+        Route::post('/items/liberar/{id}', [AdminController::class, 'restore'])->name('items.restore');
+        Route::delete('/items/{id}', [AdminController::class, 'destroy'])->name('items.destroy');
+        Route::put('/items/{id}', [AdminController::class, 'update'])->name('items.update');
+        Route::post('/items/{id}/liberar-reserva', [AdminController::class, 'liberarReservaItem'])->name('items.liberar_reserva');
+
+        // Cierre de incidentes de soporte escalados
+        Route::post('/incidencias/{id}/completar', [AdminController::class, 'completarIncidencia'])->name('incidencias.complete');
+    });
+
 });
-

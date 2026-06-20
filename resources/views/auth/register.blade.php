@@ -23,7 +23,8 @@
 
         <form action="/registro" method="POST" class="space-y-5">
             @csrf 
-            
+            {{-- Captura automáticamente el parámetro 'tipo' de la URL o asigna baby_shower por defecto --}}
+            <input type="hidden" name="tipo_evento" value="{{ request()->get('tipo', 'baby_shower') }}">
             <div>
                 <label for="nombre" class="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1.5">Nombre Completo</label>
                 <input type="text" id="nombre" name="nombre" required placeholder="Ej: María Pérez"
