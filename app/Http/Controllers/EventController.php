@@ -26,7 +26,7 @@ class EventController extends Controller
     }
 
     /**
-     * 3. STORE: Envía a Node.js la orden de crear un nuevo evento personalizado
+     * 3. STORE: Envía a Node.js la orden de crear un nuevo evento personalizado o predefinido
      */
     public function store(Request $request)
     {
@@ -34,13 +34,33 @@ class EventController extends Controller
         $usuario = Session::get('usuario_logueado');
         $idUsuario = $usuario['_id'] ?? $usuario['id'] ?? null;
 
+        $tipoEvento = $request->input('tipo_evento', 'baby_shower');
+        
+        // Mapeamos módulos automáticos según plantillas predefinidas
+        // si el usuario NO elige un evento 100% "personalizado"
+        $modulosPredefinidos = [
+            'baby_shower' => ['regalos', 'itinerario', 'menu'],
+            'matrimonio'  => ['regalos', 'mesas', 'itinerario', 'menu', 'galeria'],
+            'cumpleanos'  => ['itinerario', 'avisos', 'musica', 'galeria'],
+            'asado'       => ['cuotas', 'itinerario', 'insumos', 'musica'],
+            'fiesta'      => ['itinerario', 'avisos', 'musica', 'check_in'],
+        ];
+
+        // Si es personalizado, leemos los checkboxes del front; si no, cargamos los de la plantilla
+        if ($tipoEvento === 'personalizado') {
+            $modulosActivos = $request->input('modulos_activos', []); // Array de strings ['regalos', 'cuotas', etc.]
+        } else {
+            $modulosActivos = $modulosPredefinidos[$tipoEvento] ?? [];
+        }
+
         $datosEvento = [
-            'creador_id'   => $idUsuario,
-            'titulo'       => $request->input('titulo'),
-            'tipo_evento'  => $request->input('tipo_evento', 'baby_shower'),
-            'fecha'        => $request->input('fecha'),
-            'hora'         => $request->input('hora'),
-            'ubicacion'    => $request->input('ubicacion')
+            'creador_id'       => $idUsuario,
+            'titulo'           => $request->input('titulo'),
+            'tipo_evento'      => $tipoEvento,
+            'fecha'            => $request->input('fecha'),
+            'hora'             => $request->input('hora'),
+            'ubicacion'        => $request->input('ubicacion'),
+            'modulos_activos'  => $modulosActivos // ¡La nueva variable que espera el Backend!
         ];
 
         $response = Http::withToken($token)->post('http://localhost:3000/api/eventos', $datosEvento);

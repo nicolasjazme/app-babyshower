@@ -106,4 +106,28 @@ Route::middleware(['auth.custom'])->group(function () {
         Route::post('/incidencias/{id}/completar', [AdminController::class, 'completarIncidencia'])->name('incidencias.complete');
     });
 
+
+    // RUTAS DE MÓDULOS PREMIUM (Protegidas por middleware de sesión)
+Route::prefix('eventos/modulos')->group(function () {
+    
+    // 1. Ruta Maestra para mostrar las vistas (Regalos, Cuotas, etc.)
+    Route::get('/{modulo}', [\App\Http\Controllers\ModuloController::class, 'show'])->name('modulos.show');
+
+    // --- ACCIONES MÓDULO: REGALOS ---
+    Route::post('/regalos', [\App\Http\Controllers\ModuloController::class, 'storeRegalo']);
+    Route::delete('/regalos/{id}', [\App\Http\Controllers\ModuloController::class, 'destroyRegalo']);
+
+    // --- ACCIONES MÓDULO: CUOTAS (LA VACA) ---
+    Route::post('/cuotas/configurar', [\App\Http\Controllers\ModuloController::class, 'configurarCuotas']);
+    Route::put('/cuotas/pagos/{id}/aprobar', [\App\Http\Controllers\ModuloController::class, 'aprobarPago']);
+    Route::delete('/cuotas/pagos/{id}', [\App\Http\Controllers\ModuloController::class, 'rechazarPago']);
+
+    // --- ACCIONES MÓDULO: MESAS ---
+    Route::post('/mesas', [\App\Http\Controllers\ModuloController::class, 'storeMesa']);
+    Route::delete('/mesas/{id}', [\App\Http\Controllers\ModuloController::class, 'destroyMesa']);
+    Route::put('/mesas/asignar', [\App\Http\Controllers\ModuloController::class, 'asignarMesa']);
+    Route::put('/mesas/remover', [\App\Http\Controllers\ModuloController::class, 'removerMesa']);
+    
+});
+
 });
