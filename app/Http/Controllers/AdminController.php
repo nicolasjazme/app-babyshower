@@ -11,9 +11,9 @@ class AdminController extends Controller
 {
     // 🌐 Centralización de URLs de conexión hacia el Backend de Node.js
     private $backendUrlGifts = 'http://localhost:3000/api/regalos';
-    private $backendUrlEvents = 'http://localhost:3000/api/babyshower/todos';
-    private $backendUrlIncidencias = 'http://localhost:3000/api/babyshower/incidencias';
-    private $backendUrlMetricasRegalos = 'http://localhost:3000/api/admin/metricas/regalos'; // 💡 Nuevo endpoint de agregación
+    private $backendUrlEvents = 'http://localhost:3000/api/eventos/todos';
+    private $backendUrlIncidencias = 'http://localhost:3000/api/eventos/incidencias';
+    private $backendUrlMetricasRegalos = 'http://localhost:3000/api/admin/metricas/regalos';
 
     /**
      * Muestra el Panel de Administración con las métricas del catálogo, 
@@ -25,7 +25,7 @@ class AdminController extends Controller
         // 1. Verificación de Seguridad Estricta
         $usuario = Session::get('usuario_logueado');
         if (!isset($usuario['rol']) || $usuario['rol'] !== 'administrador') {
-            return redirect('/baby-shower')->with('error', 'No tienes permisos para acceder al panel de administración.');
+            return redirect('/')->with('error', 'No tienes permisos para acceder al panel de administración.');
         }
 
         $token = Session::get('token_jwt');
@@ -33,7 +33,7 @@ class AdminController extends Controller
         // Inicializamos variables defensivas por si falla la conexión física con NoSQL
         $gifts = collect([]);
         $incidencias = [];
-        $metricasRegalos = []; // 📊 Guardará el lote mapeado de regalos por cada Baby Shower
+        $metricasRegalos = []; 
         $metricasEvents = [
             'publicados' => 0,
             'ocultos'    => 0,
@@ -69,7 +69,7 @@ class AdminController extends Controller
                     $incidencias = $responseIncidencias->json();
                 }
 
-                // 5. 📊 NUEVO REQUERIMIENTO: Consumir las métricas de regalos asociados a cada celebración (slug)
+                // 5. Consumir las métricas de regalos asociados a cada celebración (slug)
                 $responseMetricasRegalos = Http::withToken($token)->get($this->backendUrlMetricasRegalos);
                 if ($responseMetricasRegalos->successful()) {
                     $metricasRegalos = $responseMetricasRegalos->json();
@@ -78,7 +78,6 @@ class AdminController extends Controller
                 }
             }
 
-            
         } catch (Exception $e) {
             session()->now('error', 'Fallo crítico de red: El servidor backend de Node.js está fuera de línea.');
         }
@@ -98,7 +97,6 @@ class AdminController extends Controller
             return redirect('/')->with('error', 'Acceso denegado. No tienes permisos para añadir regalos.');
         }
 
-        // Empaquetamos todos los campos exigidos sanitizando el tipo de dato numérico
         $datos = [
             'nombre'              => $request->input('nombre'),
             'descripcion'         => $request->input('descripcion'), 
@@ -149,8 +147,7 @@ class AdminController extends Controller
     }
 
     /**
-     * Liberar un regalo por completo (Cambiar de reservado a disponible de forma total)
-     * COMPARTIDO: Administrador y Anfitrión
+     * Liberar un regalo por completo
      */
     public function restore($id)
     {
@@ -170,7 +167,6 @@ class AdminController extends Controller
 
     /**
      * Eliminar un regalo físicamente del catálogo global
-     * COMPARTIDO: Administrador y Anfitrión
      */
     public function destroy($id)
     {
@@ -189,61 +185,56 @@ class AdminController extends Controller
         return back()->with('error', 'No se pudo eliminar el regalo.');
     }
 
-   /**
-     * PEDIR LISTA DE TODOS LOS BABY SHOWERS (Con auditoría de invitados mapeada en tiempo real)
+    /**
+     * PEDIR LISTA DE TODOS LOS EVENTOS (Sincronizado con Multi-Evento)
      * EXCLUSIVO: Solo Administrador
      */
-   public function listBabyShowers()
-{
-    $usuario = Session::get('usuario_logueado');
-    if (!isset($usuario['rol']) || $usuario['rol'] !== 'administrador') {
-        return redirect('/baby-shower')->with('error', 'Zona exclusiva de administración global.');
-    }
-
-    $token = Session::get('token_jwt');
-    if (!$token) return redirect('/login')->with('error', 'Sesión expirada.');
-
-    $events = [];
-
-    try {
-        // 1. Solicitamos los eventos con el token
-        $response = Http::withToken($token)->get($this->backendUrlEvents);
-        
-        if ($response->successful()) {
-            $eventosRaw = $response->json();
-            
-            foreach ($eventosRaw as $ev) {
-                $idEvento = $ev['_id'] ?? '';
-                // 🔥 CORRECCIÓN: Llamamos a la nueva ruta que creamos arriba
-                $urlInvitados = "http://localhost:3000/api/babyshower/{$idEvento}/invitados";
-                
-                $responseInvitados = Http::withToken($token)->get($urlInvitados);
-                
-                // Mapeamos los invitados al campo que tu vista Blade está esperando
-                $ev['invitados'] = $responseInvitados->successful() ? $responseInvitados->json() : [];
-                $events[] = $ev;
-            }
-        } else {
-            // Si falla, imprimimos el error para debuggear
-            \Log::error("Error al obtener eventos desde Node: " . $response->body());
+    public function listEvents()
+    {
+        $usuario = Session::get('usuario_logueado');
+        if (!isset($usuario['rol']) || $usuario['rol'] !== 'administrador') {
+            return redirect('/')->with('error', 'Zona exclusiva de administración global.');
         }
-    } catch (Exception $e) {
-        \Log::error("Fallo de comunicación: " . $e->getMessage());
-        Session::now('error', 'Fallo de comunicación física con el backend.');
-    }
 
-    return view('admin.babyshowers', compact('events'));
-}
+        $token = Session::get('token_jwt');
+        if (!$token) return redirect('/login')->with('error', 'Sesión expirada.');
+
+        $events = [];
+
+        try {
+            $response = Http::withToken($token)->get($this->backendUrlEvents);
+            
+            if ($response->successful()) {
+                $eventosRaw = $response->json();
+                
+                foreach ($eventosRaw as $ev) {
+                    $idEvento = $ev['_id'] ?? '';
+                    // 🚀 CORREGIDO: Apunta a la ruta real de Express /api/eventos/:id/invitados
+                    $urlInvitados = "http://localhost:3000/api/eventos/{$idEvento}/invitados";
+                    
+                    $responseInvitados = Http::withToken($token)->get($urlInvitados);
+                    $ev['invitados'] = $responseInvitados->successful() ? $responseInvitados->json() : [];
+                    $events[] = $ev;
+                }
+            } else {
+                \Log::error("Error al obtener eventos desde Node: " . $response->body());
+            }
+        } catch (Exception $e) {
+            \Log::error("Fallo de comunicación: " . $e->getMessage());
+            Session::now('error', 'Fallo de comunicación física con el backend.');
+        }
+
+        return view('admin.index', compact('events'));
+    }
 
     /**
-     * RF-13: Cambiar el estado de visibilidad de un Baby Shower desde la tabla de control
-     * EXCLUSIVO: Solo Administrador
+     * Cambiar el estado de visibilidad de un evento desde la tabla de control
      */
     public function updateStatus(Request $request, $id)
     {
         $usuario = Session::get('usuario_logueado');
         if (!isset($usuario['rol']) || $usuario['rol'] !== 'administrador') {
-            return redirect('/baby-shower')->with('error', 'No tienes autorización para alterar el estado de eventos ajenos.');
+            return redirect('/')->with('error', 'No tienes autorización para alterar el estado de eventos ajenos.');
         }
 
         $request->validate([
@@ -255,8 +246,8 @@ class AdminController extends Controller
             return redirect('/login')->with('error', 'Sesión expirada. Por favor vuelve a ingresar.');
         }
 
-        // Enviamos el estado modificado al backend de Node.js
-        $response = Http::withToken($token)->put("http://localhost:3000/api/babyshower/{$id}", [
+        // 🚀 CORREGIDO: Apunta a /api/eventos
+        $response = Http::withToken($token)->put("http://localhost:3000/api/eventos/{$id}", [
             'estado' => $request->input('estado')
         ]);
 
@@ -268,8 +259,7 @@ class AdminController extends Controller
     }
 
     /**
-     * Liberar una reserva específica de un invitado desde el catálogo (RF-31)
-     * EXCLUSIVO: Administrador de la plataforma
+     * Liberar una reserva específica de un invitado desde el catálogo
      */
     public function liberarRegalo(Request $request, $id)
     {
@@ -281,7 +271,6 @@ class AdminController extends Controller
         $token = Session::get('token_jwt');
 
         try {
-            // Conectamos con el backend de Node.js enviando el reservaId
             $response = Http::withToken($token)->put("http://localhost:3000/api/regalos/{$id}/reservar", [
                 'estado'    => 'disponible',
                 'reservaId' => $request->input('reserva_id')
@@ -301,8 +290,7 @@ class AdminController extends Controller
     }
 
     /**
-     * Resolver y cerrar un ticket de soporte/incidencia desde la bandeja (RF-31)
-     * EXCLUSIVO: Solo Administrador
+     * Resolver y cerrar un ticket de soporte/incidencia desde la bandeja
      */
     public function completarIncidencia($id)
     {
@@ -314,7 +302,6 @@ class AdminController extends Controller
         $token = Session::get('token_jwt');
 
         try {
-            // Enviamos la petición DELETE al backend de Node.js para remover el ticket resuelto
             $response = Http::withToken($token)->delete("{$this->backendUrlIncidencias}/{$id}");
 
             if ($response->successful()) {
@@ -331,8 +318,7 @@ class AdminController extends Controller
     }
 
     /**
-     * Elimina de forma definitiva un Baby Shower de la plataforma
-     * EXCLUSIVO: Solo Administrador
+     * Elimina de forma definitiva una celebración de la plataforma
      */
     public function destruirBabyShower($id)
     {
@@ -347,8 +333,8 @@ class AdminController extends Controller
         }
 
         try {
-            // Golpeamos el nuevo endpoint DELETE de Express
-            $response = Http::withToken($token)->delete("http://localhost:3000/api/admin/babyshower/{$id}");
+            // 🚀 CORREGIDO: Apunta a /api/eventos
+            $response = Http::withToken($token)->delete("http://localhost:3000/api/eventos/{$id}");
 
             if ($response->successful()) {
                 return back()->with('success', $response->json('mensaje') ?? 'Celebración eliminada correctamente del servidor.');

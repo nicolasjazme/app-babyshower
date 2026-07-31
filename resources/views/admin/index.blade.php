@@ -1,380 +1,247 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <title>Panel Admin - Métricas de Control</title>
-</head>
-<body class="min-h-screen flex font-sans text-stone-800" style="background-image: url('https://i.postimg.cc/3JjzxRK9/fondo-babyshower.png'); background-size: cover; background-attachment: fixed; background-position: center;">
+@extends('layouts.app')
 
-    <aside class="w-64 bg-[#F8E1C6]/90 backdrop-blur-md text-stone-800 flex flex-col shadow-lg shrink-0 border-r border-stone-200">
-        <div class="h-16 flex items-center justify-center border-b border-stone-200/50 bg-[#F8E1C6]/80">
-            <span class="text-xl font-bold tracking-wider text-stone-800">Admin Plataforma 🖥️</span>
+@section('contenido')
+<div class="max-w-7xl mx-auto space-y-8">
+
+    {{-- Encabezado Principal --}}
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+        <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold uppercase tracking-wider mb-2">
+                🛡️ Control Central
+            </div>
+            <h1 class="text-3xl font-black text-slate-900 tracking-tight">Administración Global</h1>
+            <p class="text-slate-500 text-sm mt-1">Supervisa todas las celebraciones, atiende incidencias y audita eventos en tiempo real.</p>
         </div>
-        <nav class="flex-1 px-4 py-6 space-y-2">
-            <a href="/admin" class="block px-4 py-2 bg-[#EAD8C1] rounded-xl font-bold text-stone-900 transition-colors flex items-center gap-2">
-                📊 Métricas Globales
-            </a>
-            <a href="/admin/baby-showers" class="block px-4 py-2 hover:bg-stone-200/50 rounded-xl transition-colors font-medium flex items-center gap-2 text-stone-700">
-                🍼 Ver Baby Showers
-            </a>
-            <div class="border-t border-stone-300/50 my-4"></div>
-            <a href="/baby-shower" class="block px-4 py-2 hover:bg-stone-200/50 rounded-xl transition-colors font-medium text-xs flex items-center gap-1.5 text-stone-600">
-                🏠 Ir a Pantalla Principal
-            </a>
-        </nav>
-        <div class="p-4 border-t border-stone-200/50">
-            <form action="/logout" method="POST" class="m-0">
-                @csrf
-                <button type="submit" class="w-full text-left px-4 py-2 text-stone-600 hover:text-stone-900 font-bold transition-colors cursor-pointer">
-                    🚪 Cerrar Sesión
-                </button>
-            </form>
+        
+        <div class="flex items-center gap-3">
+            <span class="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-2xl text-sm border border-slate-200">
+                Total Eventos: <span class="text-emerald-600">{{ count($eventos ?? []) }}</span>
+            </span>
         </div>
-    </aside>
+    </div>
 
-    <main class="flex-1 p-8 h-screen overflow-y-auto">
-        <div class="max-w-5xl mx-auto">
-            
-            <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 bg-[#FAD7B9]/90 backdrop-blur-sm p-6 rounded-3xl shadow-sm border border-[#F8E1C6]">
-                <div>
-                    <h1 class="text-3xl font-extrabold text-stone-800 tracking-tight">Panel de Control General</h1>
-                    <p class="text-stone-600 mt-1 text-sm">Monitorea las métricas en tiempo real y el inventario de regalos de la plataforma.</p>
-                </div>
-                <div class="bg-[#F8E1C6] px-4 py-2.5 rounded-2xl font-bold text-xs text-stone-800 uppercase tracking-wide">
-                    Admin: {{ Session::get('usuario_logueado')['nombre'] ?? 'Administrador' }}
-                </div>
-            </header>
-
-            @if(session('success'))
-                <div class="bg-[#D4EFDF] border-l-4 border-[#186A3B] text-[#186A3B] p-4 rounded-2xl mb-6 font-bold text-sm shadow-sm">
-                    ✅ {{ session('success') }}
-                </div>
-            @endif
-            @if(session('error'))
-                <div class="bg-[#FADBD8] border-l-4 border-[#7B241C] text-[#7B241C] p-4 rounded-2xl mb-6 font-bold text-sm shadow-sm">
-                    ⚠️ {{ session('error') }}
-                </div>
-            @endif
-
-            <div class="bg-white/80 backdrop-blur-md rounded-3xl shadow-sm overflow-hidden border border-stone-200 mb-8 mt-4">
-                <div class="bg-stone-100/50 p-4 border-b border-stone-200">
-                    <h3 class="text-xs font-black text-stone-700 uppercase tracking-wider">📋 Auditoría en Tiempo Real por Celebración Activa</h3>
-                </div>
-                
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse text-xs">
-                        <thead class="bg-stone-50 border-b border-stone-200 font-bold text-stone-600 uppercase tracking-wider text-[10px]">
-                            <tr>
-                                <th class="p-4">Celebración / Enlace Único</th>
-                                <th class="p-4 text-center">Asistencias Confirmadas</th>
-                                <th class="p-4 text-center">Total Catálogo</th>
-                                <th class="p-4 text-center">Reservados</th>
-                                <th class="p-4 text-center">Disponibles</th>
-                                <th class="p-4 text-right">Auditar Inventario</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-stone-100">
-                            @forelse($metricasRegalos ?? [] as $show)
-                            <tr class="hover:bg-stone-50/50 transition-colors">
-                                <td class="p-4">
-                                    <p class="font-extrabold text-stone-800 text-sm">👶 Baby Shower: {{ $show['bebeNombre'] ?? 'Sin nombre' }}</p>
-                                    <p class="text-[#3949AB] font-mono text-[10px] mt-0.5 tracking-tight">🔗 /e/{{ $show['slug'] }}</p>
-                                </td>
-                                <td class="p-4 text-center font-bold text-stone-700 text-sm">
-                                    <span id="confirmados-{{ $show['slug'] }}" class="bg-[#E8EAF6] text-[#3949AB] px-3 py-1 rounded-xl border border-[#C5CAE9] font-mono text-[11px]">
-                                        👥 {{ $show['invitadosConfirmados'] ?? 0 }} Sí
-                                    </span>
-                                </td>
-                                <td class="p-4 text-center font-bold text-stone-700 text-sm">
-                                    {{ $show['totalRegalos'] ?? 0 }}
-                                </td>
-                                <td class="p-4 text-center">
-                                    <span id="reservados-{{ $show['slug'] }}" class="bg-[#FCF3CF] text-[#7D6608] font-bold px-2.5 py-0.5 rounded-lg border border-[#F9E79F] font-mono text-[11px]">
-                                        🔥 {{ $show['regalosReservados'] ?? 0 }}
-                                    </span>
-                                </td>
-                                <td class="p-4 text-center">
-                                    <span id="disponibles-{{ $show['slug'] }}" class="bg-[#D4EFDF] text-[#186A3B] font-bold px-2.5 py-0.5 rounded-lg border border-[#A9DFBF] font-mono text-[11px]">
-                                        ✅ {{ $show['regalosDisponibles'] ?? 0 }}
-                                    </span>
-                                </td>
-                                <td class="p-4 text-right align-middle space-x-2 whitespace-nowrap">
-                                    <button type="button" onclick="mostrarModalRegalos('modal-regalos-{{ $loop->index }}', '{{ addslashes($show['bebeNombre'] ?? 'Sin nombre') }}')" class="text-stone-700 hover:text-stone-900 hover:bg-stone-200 font-bold cursor-pointer select-none tracking-wide uppercase text-[9px] bg-stone-100 px-3 py-2 rounded-xl inline-block transition-all border border-stone-200 shadow-sm">
-                                        👁️ Ver Artículos
-                                    </button>
-
-                                    <div id="modal-regalos-{{ $loop->index }}" class="hidden">
-                                        <div class="text-left space-y-2 font-sans mt-2">
-                                            @forelse($show['listadoRegalos'] ?? [] as $regalo)
-                                            <div class="border-b border-stone-100 last:border-0 pb-3 mb-2 bg-white/60 p-3 rounded-2xl border border-stone-200">
-                                                <div class="flex justify-between items-start text-[12px] gap-2 mb-1">
-                                                    <span class="font-extrabold text-stone-800 block whitespace-normal pr-2">
-                                                        {{ $regalo['nombre'] }} 
-                                                        <span class="text-[#3949AB] font-mono text-[11px] ml-1 bg-white px-1.5 py-0.5 rounded-lg border border-stone-200 shadow-inner">
-                                                            ({{ $regalo['cantidad_disponible'] ?? 0 }} / {{ $regalo['cantidad_solicitada'] ?? 1 }})
-                                                        </span>
-                                                    </span>
-                                                    <span class="text-[9px] uppercase font-black px-2 py-0.5 rounded-lg border tracking-wider shrink-0 {{ ($regalo['estado'] ?? 'disponible') === 'reservado' ? 'bg-[#FADBD8] text-[#7B241C] border-[#F5B7B1]' : 'bg-[#D4EFDF] text-[#186A3B] border-[#A9DFBF]' }}">
-                                                        {{ $regalo['estado'] ?? 'disponible' }}
-                                                    </span>
-                                                </div>
-                                                
-                                                @if(!empty($regalo['lista_invitados']) && count($regalo['lista_invitados']) > 0)
-                                                    <div class="mt-2.5 space-y-1.5">
-                                                        @foreach($regalo['lista_invitados'] as $reserva)
-                                                            <div class="flex justify-between items-center bg-white/80 p-2 rounded-xl border border-stone-200 shadow-sm">
-                                                                <p class="text-[10px] text-stone-600 font-medium whitespace-normal flex items-center gap-1.5">
-                                                                    👤 <span class="bg-[#FCF3CF] text-[#7D6608] px-2 py-1 rounded-lg font-bold uppercase tracking-wider text-[9px] border border-[#F9E79F]">{{ $reserva['nombre'] ?? 'Invitado' }}</span>
-                                                                </p>
-                                                                <form action="{{ route('admin.regalos.liberar_reserva', $regalo['_id'] ?? '') }}" method="POST" class="m-0 inline" onsubmit="return confirm('¿Seguro que deseas liberar esta reserva? El regalo volverá a estar disponible.')">
-                                                                    @csrf
-                                                                    <input type="hidden" name="reserva_id" value="{{ $reserva['_id'] ?? '' }}">
-                                                                    <button type="submit" class="text-red-500 hover:text-white hover:bg-red-500 font-black px-2.5 py-1 text-[9px] uppercase tracking-wider rounded-lg bg-red-50 border border-red-200 transition-all cursor-pointer">
-                                                                        ✕ Anular
-                                                                    </button>
-                                                                </form>
-                                                            </div>
-                                                        @endforeach
-                                                    </div>
-                                                @endif
-                                            </div>
-                                            @empty
-                                            <p class="text-stone-400 font-medium italic text-[12px] py-4 text-center">El anfitrión no ha cargado regalos sugeridos.</p>
-                                            @endforelse
-                                        </div>
-                                    </div>
-
-                                    <form action="{{ route('admin.babyshowers.destroy', $show['_id'] ?? '') }}" method="POST" onsubmit="return confirm('⚠️ ADVERTENCIA CRÍTICA: ¿Estás seguro de que deseas eliminar permanentemente este Baby Shower y todo su inventario asociado?')" class="inline m-0">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="text-red-500 hover:bg-red-50 hover:text-red-700 border border-transparent hover:border-red-200 px-3 py-2 rounded-xl transition-all font-bold cursor-pointer uppercase text-[9px] tracking-wider ml-1">
-                                            🗑️ Eliminar
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                            @empty
-                            <tr>
-                                <td colspan="6" class="p-8 text-center text-stone-400 font-medium italic">No hay registros de baby showers en la Plataforma.</td>
-                            </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+    {{-- Métricas Rápidas --}}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl font-bold">
+                🎉
             </div>
-
-            <h3 class="text-xs font-bold text-stone-500 uppercase tracking-wider mb-3">🍼 Estado de Celebraciones en la Plataforma</h3>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-stone-200 flex items-center">
-                    <div class="w-12 h-12 bg-[#D4EFDF] text-[#186A3B] rounded-2xl flex items-center justify-center text-2xl mr-4">🌐</div>
-                    <div>
-                        <p class="text-xs text-stone-500 font-bold uppercase tracking-wider">Eventos Publicados</p>
-                        <p class="text-2xl font-black text-stone-800 mt-0.5">{{ $metricasEvents['publicados'] ?? 0 }}</p>
-                    </div>
-                </div>
-                <div class="bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-stone-200 flex items-center">
-                    <div class="w-12 h-12 bg-[#FCF3CF] text-[#7D6608] rounded-2xl flex items-center justify-center text-2xl mr-4">👁️‍🗨️</div>
-                    <div>
-                        <p class="text-xs text-stone-500 font-bold uppercase tracking-wider">Eventos Ocultos</p>
-                        <p class="text-2xl font-black text-stone-800 mt-0.5">{{ $metricasEvents['ocultos'] ?? 0 }}</p>
-                    </div>
-                </div>
-                <div class="bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-sm border border-stone-200 flex items-center">
-                    <div class="w-12 h-12 bg-[#FADBD8] text-[#7B241C] rounded-2xl flex items-center justify-center text-2xl mr-4">🔒</div>
-                    <div>
-                        <p class="text-xs text-stone-500 font-bold uppercase tracking-wider">Eventos Cerrados</p>
-                        <p class="text-2xl font-black text-stone-800 mt-0.5">{{ $metricasEvents['cerrados'] ?? 0 }}</p>
-                    </div>
-                </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Eventos Activos</p>
+                <h3 class="text-2xl font-black text-slate-800">{{ count($eventos ?? []) }}</h3>
             </div>
+        </div>
 
-            <div class="bg-white/80 backdrop-blur-md p-8 rounded-3xl shadow-sm mb-6 border border-stone-200 mt-10">
-                <h2 class="text-base font-extrabold text-stone-800 mb-5 flex items-center gap-2">✨ Añadir Nuevo Regalo al Catálogo Base Global</h2>
-                <form action="{{ route('gifts.store') }}" method="POST" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    @csrf
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Nombre del Artículo *</label>
-                        <input type="text" name="nombre" placeholder="Ej: Cuna Mecedora de Madera" required class="w-full border border-stone-200 p-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] text-xs bg-white/60 font-medium">
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Descripción Detallada</label>
-                        <input type="text" name="descripcion" placeholder="Ej: Color blanco con colchón antiahogo" class="w-full border border-stone-200 p-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] text-xs bg-white/60 font-medium">
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-stone-500 uppercase tracking-wider">URL Imagen Referencial</label>
-                        <input type="text" name="imagen" placeholder="http://tienda.com/foto.jpg" class="w-full border border-stone-200 p-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] text-xs bg-white/60 font-mono">
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Categoría</label>
-                        <select name="categoria" class="w-full border border-stone-200 p-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] text-xs bg-white/60 cursor-pointer font-bold text-stone-700">
-                            <option value="Higiene">🧻 Higiene y Aseo</option>
-                            <option value="Dormitorio">🛏️ Dormitorio y Cunas</option>
-                            <option value="Alimentación">🍼 Alimentación y Lactancia</option>
-                            <option value="Ropa">👕 Vestuario y Ropa</option>
-                            <option value="Transporte">🚗 Transporte y Paseo</option>
-                            <option value="General" selected>📦 General / Otros</option>
-                        </select>
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Tipo de Artículo</label>
-                        <select name="tipo" id="select-tipo" onchange="conmutarCantidad(this.value)" class="w-full border border-stone-200 p-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] text-xs bg-white/60 cursor-pointer font-bold text-stone-700">
-                            <option value="unico" selected>🔒 Único (Solo 1 unidad)</option>
-                            <option value="repetible">🔄 Repetible (Múltiples unidades)</option>
-                        </select>
-                    </div>
-                    <div class="flex flex-col gap-1.5">
-                        <label class="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Cantidad Requerida</label>
-                        <input type="number" id="input-cantidad" name="cantidad_solicitada" value="1" min="1" required class="w-full border border-stone-200 p-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] text-xs bg-stone-200 text-stone-400 font-bold" readonly>
-                    </div>
-                    <div class="flex flex-col gap-1.5 md:col-span-2 lg:col-span-3">
-                        <label class="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Enlace Externo de Compra Opcional</label>
-                        <input type="text" name="link_referencia" placeholder="https://www.tienda.com/producto" class="w-full border border-stone-200 p-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] text-xs bg-white/60 font-mono">
-                    </div>
-                    <div class="md:col-span-2 lg:col-span-3 flex justify-end pt-2">
-                        <button type="submit" class="bg-[#F8E1C6] hover:bg-[#EAD8C1] text-stone-900 px-10 py-4 rounded-3xl font-extrabold transition-all text-xs whitespace-nowrap shadow-md cursor-pointer tracking-wider uppercase">
-                            ➕ Guardar Regalo Nuevo
-                        </button>
-                    </div>
-                </form>
+        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
+                ⚠️
             </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Incidencias</p>
+                <h3 class="text-2xl font-black text-slate-800">{{ count($incidencias ?? []) }}</h3>
+            </div>
+        </div>
 
-            <h3 class="text-xs font-bold text-stone-500 uppercase tracking-wider mb-3 mt-6">📨 Incidencias y Solicitudes de Soporte Activas</h3>
-            <div class="bg-white/80 backdrop-blur-md rounded-3xl shadow-sm border border-stone-200 p-8 mb-12">
-                <div class="divide-y divide-stone-200/60">
-                    @if(isset($incidencias) && count($incidencias) > 0)
-                        @foreach($incidencias as $incidencia)
-                            <div class="py-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs">
-                                <div>
-                                    <span class="font-bold text-[#3949AB]">👤 {{ $incidencia['anfitrion'] ?? 'Anfitrión' }}</span>
-                                    <span class="text-stone-300 mx-1.5">|</span>
-                                    <span class="text-stone-500 font-medium">{{ date('d/m/Y H:i', strtotime($incidencia['createdAt'])) }}</span>
-                                    <p class="text-stone-700 mt-2 font-medium bg-white/50 p-3.5 rounded-2xl border border-stone-200 max-w-2xl leading-relaxed">
-                                        "{{ $incidencia['mensaje'] }}"
-                                    </p>
-                                </div>
-                                <form action="{{ route('incidencias.complete', $incidencia['_id'] ?? $loop->index) }}" method="POST" class="m-0">
-                                    @csrf
-                                    <button type="submit" class="bg-stone-800 hover:bg-black text-white px-5 py-3 rounded-2xl font-bold transition-all text-[10px] uppercase tracking-wider shadow-sm cursor-pointer whitespace-nowrap">
-                                        ✓ Resolver ticket
-                                    </button>
-                                </form>
+        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+                👥
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Anfitriones</p>
+                <h3 class="text-2xl font-black text-slate-800">{{ $totalUsuarios ?? count($eventos ?? []) }}</h3>
+            </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl font-bold">
+                ⚡
+            </div>
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Estado API</p>
+                <span class="inline-flex items-center gap-1.5 text-xs font-extrabold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Node Online
+                </span>
+            </div>
+        </div>
+    </div>
+
+    {{-- Seccion 1: Bandeja de Incidencias / Soporte --}}
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+                <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    🚨 Tickets de Incidencias / Soporte
+                </h2>
+                <p class="text-slate-500 text-xs mt-0.5">Reportes enviados por anfitriones pendientes de atención.</p>
+            </div>
+            <span class="px-3 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-full">
+                {{ count($incidencias ?? []) }} Abiertas
+            </span>
+        </div>
+
+        @if(empty($incidencias))
+            <div class="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <p class="text-2xl mb-1">🎉</p>
+                <p class="text-slate-600 font-bold text-sm">¡Sin incidencias pendientes!</p>
+                <p class="text-slate-400 text-xs">Todos los tickets de soporte han sido resueltos correctamente.</p>
+            </div>
+        @else
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                @foreach($incidencias as $ticket)
+                    <div id="ticket-{{ $ticket['_id'] ?? $ticket['id'] }}" class="p-4 rounded-2xl border border-amber-200 bg-amber-50/50 flex flex-col justify-between space-y-3">
+                        <div>
+                            <div class="flex justify-between items-start gap-2">
+                                <span class="px-2.5 py-1 bg-amber-200 text-amber-900 text-xs font-black rounded-lg uppercase">
+                                    {{ $ticket['tipo'] ?? 'Soporte' }}
+                                </span>
+                                <span class="text-xs text-slate-400 font-medium">
+                                    {{ \Carbon\Carbon::parse($ticket['created_at'] ?? now())->diffForHumans() }}
+                                </span>
                             </div>
-                        @endforeach
-                    @else
-                        <div class="py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 text-xs">
-                            <div>
-                                <span class="font-bold text-[#3949AB]"> 📨 Canal de Comunicación Interno (Soporte)</span>
-                                <span class="text-stone-300 mx-1.5">|</span>
-                                <span class="text-stone-500 font-medium">Bandeja de Entrada Global</span>
-                                <p class="text-stone-600 mt-2 font-medium bg-white/50 p-3.5 rounded-2xl border border-stone-200">
-                                    Las solicitudes de soporte o incidencias de stock enviadas por los anfitriones aparecerán listadas aquí.
-                                </p>
-                            </div>
+                            <h4 class="font-bold text-slate-900 text-base mt-2">{{ $ticket['titulo'] ?? 'Reporte de Anfitrión' }}</h4>
+                            <p class="text-slate-600 text-xs mt-1 leading-relaxed">{{ $ticket['descripcion'] ?? 'Sin detalle adicional' }}</p>
                         </div>
-                    @endif
-                </div>
+                        
+                        <div class="flex items-center justify-between pt-2 border-t border-amber-200/60">
+                            <span class="text-xs text-slate-500">Evento ID: <strong class="text-slate-700">{{ substr($ticket['evento_id'] ?? 'N/A', 0, 8) }}...</strong></span>
+                            <button onclick="resolverTicket('{{ $ticket['_id'] ?? $ticket['id'] }}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
+                                ✅ Resolver Ticket
+                            </button>
+                        </div>
+                    </div>
+                @endforeach
             </div>
+        @endif
+    </div>
 
+    {{-- Seccion 2: Tabla de Control Global de Celebraciones --}}
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+                <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    🎉 Directores de Eventos Registrados
+                </h2>
+                <p class="text-slate-500 text-xs mt-0.5">Listado centralizado de todas las celebraciones de la plataforma.</p>
+            </div>
         </div>
-    </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-slate-200 text-xs font-bold text-slate-400 uppercase bg-slate-50/50">
+                        <th class="py-3 px-4 rounded-l-xl">Evento / Anfitrión</th>
+                        <th class="py-3 px-4">Tipo</th>
+                        <th class="py-3 px-4">Fecha</th>
+                        <th class="py-3 px-4">Módulos Activos</th>
+                        <th class="py-3 px-4 text-center rounded-r-xl">Acciones Audit</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-sm">
+                    @forelse($eventos ?? [] as $evento)
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="py-3.5 px-4">
+                                <div class="font-bold text-slate-900">{{ $evento['nombre_evento'] ?? 'Celebración sin nombre' }}</div>
+                                <div class="text-xs text-slate-400">Creador: {{ $evento['creador_email'] ?? 'Anfitrión' }}</div>
+                            </td>
+                            <td class="py-3.5 px-4">
+                                <span class="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full text-xs font-bold capitalize">
+                                    {{ str_replace('_', ' ', $evento['tipo_evento'] ?? 'general') }}
+                                </span>
+                            </td>
+                            <td class="py-3.5 px-4 text-slate-600 font-medium">
+                                {{ $evento['fecha_evento'] ?? 'Por definir' }}
+                            </td>
+                            <td class="py-3.5 px-4">
+                                <div class="flex flex-wrap gap-1 max-w-xs">
+                                    @foreach(array_slice($evento['modulos_activos'] ?? [], 0, 4) as $mod)
+                                        <span class="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-semibold rounded-md">
+                                            {{ $mod }}
+                                        </span>
+                                    @endforeach
+                                    @if(count($evento['modulos_activos'] ?? []) > 4)
+                                        <span class="text-[10px] text-slate-400 font-bold align-center">+{{ count($evento['modulos_activos']) - 4 }} más</span>
+                                    @endif
+                                </div>
+                            </td>
+                            <td class="py-3.5 px-4 text-center">
+                                <button onclick="auditarEvento('{{ $evento['_id'] ?? $evento['id'] }}', '{{ addslashes($evento['nombre_evento'] ?? '') }}')" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
+                                    🔍 Auditar
+                                </button>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="py-8 text-center text-slate-400 text-sm">
+                                No se encontraron eventos registrados en el servidor Node.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
-    <script>
-        // Conexión directa a tu backend de Node.js en el puerto 3000
-        const socket = io('http://localhost:3000');
-
-        socket.on('connect', () => {
-            console.log('🔌 Conectado exitosamente al canal en tiempo real.');
-        });
-
-        // 🔥 ESCUCHADOR EN TIEMPO REAL PARA INVITADOS CONFIRMADOS
-        socket.on('nuevo-invitado', function(invitado) {
-            // Buscamos la celda correspondiente al slug del Baby Shower del invitado
-            const celdaAsistencias = document.getElementById(`confirmados-${invitado.slug}`);
-            
-            if (celdaAsistencias && invitado.estadoAsistencia === 'confirmado') {
-                // Notificación emergente Toast (Arriba a la derecha)
+{{-- Scripts JS para API y SweetAlert2 --}}
+<script>
+function resolverTicket(id) {
+    Swal.fire({
+        title: '¿Cerrar esta incidencia?',
+        text: "El ticket quedará marcado como resuelto en la base de datos.",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#059669',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, resolver',
+        cancelButtonText: 'Cancelar',
+        customClass: { popup: 'rounded-3xl' }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(`/api/eventos/incidencias/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
                 Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'info',
-                    title: `¡Asistencia confirmada de ${invitado.nombre}!`,
-                    showConfirmButton: false,
-                    timer: 4000,
-                    timerProgressBar: true
+                    icon: 'success',
+                    title: '¡Ticket Resuelto!',
+                    text: data.mensaje || 'La incidencia ha sido solucionada.',
+                    confirmButtonColor: '#0B6658',
+                    customClass: { popup: 'rounded-3xl' }
                 });
-
-                // Extraemos el número actual, sumamos 1 y actualizamos visualmente
-                let numActual = parseInt(celdaAsistencias.innerText.replace(/[^0-9]/g, '')) || 0;
-                celdaAsistencias.innerHTML = `👥 ${numActual + 1} Sí`;
-            }
-        });
-
-        // 🔥 ESCUCHADOR EN TIEMPO REAL PARA CUANDO SE RESERVA UN REGALO
-        socket.on('regalo-reservado', function(data) {
-            const badgeReservados = document.getElementById(`reservados-${data.slug}`);
-            const badgeDisponibles = document.getElementById(`disponibles-${data.slug}`);
-
-            if (badgeReservados && badgeDisponibles) {
-                let reservados = parseInt(badgeReservados.innerText.replace(/[^0-9]/g, '')) || 0;
-                let disponibles = parseInt(badgeDisponibles.innerText.replace(/[^0-9]/g, '')) || 0;
-
-                badgeReservados.innerHTML = `🔥 ${reservados + 1}`;
-                if (disponibles > 0) {
-                    badgeDisponibles.innerHTML = `✅ ${disponibles - 1}`;
-                }
-            }
-        });
-
-        function mostrarModalRegalos(idElemento, nombreBebe) {
-            const contenidoHTML = document.getElementById(idElemento).innerHTML;
-            
-            Swal.fire({
-                title: `🎁 Inventario: ${nombreBebe}`,
-                html: contenidoHTML,
-                showCloseButton: true,
-                showConfirmButton: false,
-                width: '36em', 
-                customClass: {
-                    popup: 'rounded-3xl shadow-2xl border border-stone-200 bg-[#FDFBF7]',
-                    title: 'text-base font-extrabold text-stone-800 text-left w-full border-b border-stone-200 pb-3',
-                    htmlContainer: 'p-1'
-                }
+                const card = document.getElementById(`ticket-${id}`);
+                if(card) card.remove();
+            })
+            .catch(err => {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo cerrar la incidencia.',
+                    confirmButtonColor: '#e11d48'
+                });
             });
         }
+    });
+}
 
-        function conmutarCantidad(tipo) {
-            const input = document.getElementById('input-cantidad');
-            if (tipo === 'unico') {
-                input.value = 1;
-                input.readOnly = true;
-                input.classList.replace('bg-white/60', 'bg-stone-200');
-                input.classList.replace('text-stone-800', 'text-stone-400');
-            } else {
-                input.readOnly = false;
-                input.value = 5; 
-                input.classList.replace('bg-stone-200', 'bg-white/60');
-                input.classList.replace('text-stone-400', 'text-stone-800');
-            }
-        }
-    </script>
-
-    @if(session('success'))
-        <script>
-            Swal.fire({
-                icon: 'success',
-                title: '¡Operación Exitosa!',
-                text: "{{ session('success') }}",
-                confirmButtonColor: '#0B6658', 
-                timer: 4500,
-                timerProgressBar: true,
-                customClass: { popup: 'rounded-3xl' }
-            });
-        </script>
-    @endif
-</body>
-</html>
+function auditarEvento(id, nombre) {
+    Swal.fire({
+        title: `Auditoría: ${nombre}`,
+        html: `
+            <div class="text-left text-sm space-y-3 p-2">
+                <p><strong>ID Evento:</strong> <code class="bg-slate-100 px-2 py-0.5 rounded text-xs">${id}</code></p>
+                <p class="text-slate-500">Conexión con MongoDB establecida. Los registros de asistentes, regalos e insumos se gestionan vía API Node.</p>
+            </div>
+        `,
+        icon: 'info',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#0F172A',
+        customClass: { popup: 'rounded-3xl' }
+    });
+}
+</script>
+@endsection

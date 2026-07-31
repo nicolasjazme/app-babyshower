@@ -1,66 +1,60 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar Sesión - App Baby Shower</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="min-h-screen flex items-center justify-center p-4 font-sans text-stone-800" style="background-image: url('https://i.postimg.cc/3JjzxRK9/fondo-babyshower.png'); background-size: cover; background-attachment: fixed; background-position: center;">
+@extends('layouts.app')
 
-    <div class="w-full max-w-md">
-        <div class="bg-white/80 backdrop-blur-md p-10 rounded-3xl shadow-xl border border-stone-200">
-            <div class="text-center mb-8">
-                <div class="text-6xl mb-4">🍼</div>
-                <h1 class="text-3xl font-extrabold text-stone-800">¡Bienvenido!</h1>
-                <p class="text-stone-600 text-sm mt-2">Accede a tu panel para gestionar tu evento.</p>
-            </div>
-
-            @if(session('success'))
-                <div class="bg-[#D4EFDF] border-l-4 border-[#186A3B] text-[#186A3B] p-4 rounded-2xl mb-6 font-bold text-xs shadow-sm">
-                    ✅ {{ session('success') }}
-                </div>
-            @endif
-            @if(session('error'))
-                <div class="bg-[#FADBD8] border-l-4 border-[#7B241C] text-[#7B241C] p-4 rounded-2xl mb-6 font-bold text-xs shadow-sm">
-                    ⚠️ {{ session('error') }}
-                </div>
-            @endif
-
-            <form action="/login" method="POST" class="space-y-6">
-                @csrf 
-                <div>
-                    <label for="correo" class="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1.5">Correo Electrónico</label>
-                    <input type="email" id="correo" name="correo" required placeholder="correo@ejemplo.com"
-                        class="w-full px-4 py-3 border border-stone-200 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] transition-all bg-white/60 text-sm font-medium">
-                </div>
-
-                <div>
-                    <div class="flex justify-between items-center mb-1.5">
-                        <label for="contrasena" class="block text-[10px] font-bold text-stone-500 uppercase tracking-wider">Contraseña</label>
-                        <a href="/recuperar-contrasena" class="text-[10px] text-[#3949AB] font-bold hover:underline">¿Olvidaste tu contraseña?</a>
-                    </div>
-                    <input type="password" id="contrasena" name="contrasena" required placeholder="••••••••"
-                        class="w-full px-4 py-3 border border-stone-200 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] transition-all bg-white/60 text-sm font-medium">
-                </div>
-
-                <button type="submit"
-                    class="w-full bg-[#F8E1C6] hover:bg-[#EAD8C1] text-stone-900 font-extrabold py-4 rounded-2xl transition-all shadow-md uppercase tracking-wider text-sm cursor-pointer mt-2">
-                    🚀 Iniciar Sesión
-                </button>
-            </form>
-
-            <div class="mt-8 text-center text-xs text-stone-500 font-medium">
-                ¿No tienes una cuenta? 
-                <a href="/registro" class="text-[#3949AB] font-bold hover:underline ml-1">Regístrate aquí</a>
-            </div>
-        </div>
+@section('contenido')
+<div class="min-h-[80vh] flex items-center justify-center px-4">
+    <div class="max-w-md w-full bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-xl border border-slate-100 relative">
         
-        <p class="text-center text-[10px] text-stone-400 mt-8 uppercase tracking-widest font-bold">
-            Desarrollado por Nicolás Jazme - Patricio Larenas - Hector Humeres 2026
-        </p>
+        {{-- Encabezado Neutro Invita App --}}
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 text-2xl font-bold mb-3 shadow-inner">
+                ✨
+            </div>
+            <h1 class="text-2xl font-black text-slate-900 tracking-tight">Bienvenido a Invita App</h1>
+            <p class="text-xs text-slate-500 mt-1">Ingresa a tu cuenta para gestionar tus celebraciones</p>
+        </div>
+
+        @if(session('error'))
+            <div class="mb-4 p-3 bg-rose-50 border border-rose-100 text-rose-600 text-xs font-bold rounded-2xl text-center">
+                {{ session('error') }}
+            </div>
+        @endif
+
+        {{-- Formulario de Acceso --}}
+        <form action="/login" method="POST" class="space-y-4">
+            @csrf
+
+            <div>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Correo Electrónico</label>
+                <input type="email" name="email" required placeholder="tu@correo.com"
+                       class="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-200 transition-all text-sm font-medium">
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Contraseña</label>
+                <input type="password" name="password" required placeholder="••••••••"
+                       class="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-200 transition-all text-sm font-medium">
+            </div>
+
+            <div class="flex items-center justify-between text-xs pt-1">
+                <label class="flex items-center gap-2 cursor-pointer text-slate-600">
+                    <input type="checkbox" name="remember" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-200">
+                    <span>Recordarme</span>
+                </label>
+                <a href="/recuperar" class="font-bold text-indigo-600 hover:text-indigo-700 transition-colors">¿Olvidaste tu contraseña?</a>
+            </div>
+
+            <button type="submit" class="w-full mt-2 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs uppercase tracking-wider rounded-2xl shadow-lg transition-all">
+                Iniciar Sesión
+            </button>
+        </form>
+
+        <div class="mt-8 text-center border-t border-slate-100 pt-6">
+            <p class="text-xs text-slate-500">
+                ¿Aún no tienes una cuenta? 
+                <a href="/registro" class="font-bold text-indigo-600 hover:text-indigo-700 transition-colors">Regístrate gratis</a>
+            </p>
+        </div>
+
     </div>
-
-</body>
-</html>
-
+</div>
+@endsection
