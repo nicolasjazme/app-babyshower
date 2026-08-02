@@ -25,13 +25,13 @@
 
             <div>
                 <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Correo Electrónico</label>
-                <input type="email" name="email" required placeholder="tu@correo.com"
+                <input type="email" name="correo" required placeholder="tu@correo.com"
                        class="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-200 transition-all text-sm font-medium">
             </div>
 
             <div>
                 <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Contraseña</label>
-                <input type="password" name="password" required placeholder="••••••••"
+                <input type="password" name="contrasena" required placeholder="••••••••"
                        class="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-200 transition-all text-sm font-medium">
             </div>
 

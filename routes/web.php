@@ -56,6 +56,9 @@ Route::middleware(['auth.custom'])->group(function () {
     // --- Módulo General de Interacción Interactiva (Regalos, Cooperación, Tablas) ---
     Route::post('/eventos/reservar-item', [EventController::class, 'reserveItem'])->name('items.reserve');
 
+    // --- ACCESOS RÁPIDOS GLOBALES DE EVENTOS ---
+    Route::get('/eventos/crear', [EventController::class, 'create'])->name('eventos.crear');
+    Route::post('/eventos/guardar', [EventController::class, 'store'])->name('eventos.guardar');
 
     // ========================================================
     // 🍼 MÓDULO ANFITRIÓN: CONTROL DE SUS EVENTOS PROPIOS

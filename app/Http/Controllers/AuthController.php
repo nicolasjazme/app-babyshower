@@ -4,12 +4,12 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Session; // Agregamos Session para guardar el estado del usuario
+use Illuminate\Support\Facades\Session;
 
 class AuthController extends Controller
 {
     // ==========================================
-    // REGISTRO (RF-01) - ¡ACTUALIZADO PARA INVITA APP!
+    // FORMULARIO DE REGISTRO (RF-01)
     // ==========================================
     public function showRegisterForm()
     {
@@ -18,32 +18,45 @@ class AuthController extends Controller
 
     public function register(Request $request)
     {
-        // 1. Capturamos los datos tradicionales sumando el parámetro dinámico 'tipo_evento'
+        $nombre     = $request->input('nombre');
+        $correo     = $request->input('correo') ?? $request->input('email');
+        $contrasena = $request->input('contrasena') ?? $request->input('password');
+
+        if (empty($nombre) || empty($correo) || empty($contrasena)) {
+            return back()->with('error', 'Todos los campos son obligatorios.');
+        }
+
         $datos = [
-            'nombre'     => $request->input('nombre'),
-            'correo'     => $request->input('correo'),
-            'contrasena' => $request->input('contrasena'),
-            'rol'        => $request->input('rol') ?? 'organizador', // Rol por defecto si no viene marcado
-            
-            // 🚀 NUEVO: Captura el tipo de evento elegido en la página de inicio general
-            'tipo_evento'   => $request->input('tipo_evento', 'baby_shower'), 
+            'nombre'        => $nombre,
+            'correo'        => $correo,
+            'email'         => $correo,
+            'contrasena'    => $contrasena,
+            'password'      => $contrasena,
+            'rol'           => $request->input('rol') ?? 'anfitrion',
+            'tipo_evento'   => $request->input('tipo_evento', 'general'), 
             'titulo_evento' => 'Mi ' . ucfirst(str_replace('_', ' ', $request->input('tipo_evento', 'celebracion')))
         ];
 
-        // 2. Enviamos al endpoint del Backend en Node.js (actualizado a la ruta unificada)
-        $response = Http::post('http://localhost:3000/api/usuarios/registro', $datos);
+        try {
+            $response = Http::timeout(5)->post('http://localhost:3000/api/usuarios/registro', $datos);
+        } catch (\Exception $e) {
+            return back()->with('error', 'No se pudo conectar con el servidor Backend (Node.js en puerto 3000).');
+        }
 
         if ($response->successful()) {
-            return redirect('/login')->with('success', '¡Cuenta creada con éxito! Ahora inicia sesión para personalizar tu evento.');
+            return redirect('/login')->with('success', '¡Cuenta creada con éxito! Inicia sesión para personalizar tu evento.');
         } else {
-            // Obtenemos el error del backend
-            $mensajeError = $response->json('error') ?? $response->json('mensaje') ?? 'Error al registrar';
+            $json = $response->json();
+            $mensajeError = is_array($json) 
+                ? ($json['mensaje'] ?? $json['error'] ?? $json['message'] ?? 'Error al registrar la cuenta.')
+                : 'Error al procesar el registro en el servidor.';
+                
             return back()->with('error', $mensajeError);
         }
     }
 
     // ==========================================
-    // INICIO DE SESIÓN (RF-02) - ¡ACTUALIZADO PARA PROTOCOLO GENERAL!
+    // FORMULARIO DE LOGIN (RF-02)
     // ==========================================
     public function showLoginForm()
     {
@@ -52,52 +65,72 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
+        $correo     = trim($request->input('correo') ?? $request->input('email') ?? '');
+        $contrasena = trim($request->input('contrasena') ?? $request->input('password') ?? '');
+
+        if (empty($correo) || empty($contrasena)) {
+            return back()->with('error', 'Por favor ingresa correo y contraseña.');
+        }
+
         $credenciales = [
-            'correo' => $request->input('correo'),
-            'contrasena' => $request->input('contrasena'),
+            'correo'     => $correo,
+            'email'      => $correo,
+            'contrasena' => $contrasena,
+            'password'   => $contrasena
         ];
 
-        $response = Http::post('http://localhost:3000/api/usuarios/login', $credenciales);
+        try {
+            $response = Http::timeout(5)->post('http://localhost:3000/api/usuarios/login', $credenciales);
+        } catch (\Exception $e) {
+            return back()->with('error', 'No se pudo conectar con el servidor Backend (Node.js en puerto 3000).');
+        }
 
         if ($response->successful()) {
             $usuario = $response->json('usuario');
-            $token = $response->json('token'); 
+            $token   = $response->json('token'); 
 
-            // Guardamos todo en la sesión
-            $usuarioLogueado = Session::put('usuario_logueado', $usuario);
+            Session::put('usuario_logueado', $usuario);
             Session::put('token_jwt', $token); 
 
-            // 🚪 ENRUTAMIENTO POR ROLES EN INVITA APP
-            if (isset($usuario['rol'])) {
-                
-                if ($usuario['rol'] === 'administrador') {
-                    // El admin va a su panel global
-                    return redirect('/admin')->with('success', '¡Bienvenido, Administrador de Invita App!');
-                } 
-                elseif ($usuario['rol'] === 'organizador') {
-                    // El organizador va a su panel general de eventos (Rutas modificadas en el Paso 3 anterior)
-                    return redirect('/eventos/dashboard')->with('success', '¡Bienvenido de vuelta a tu panel de control!');
-                } 
-                else {
-                    // CUALQUIER OTRO (Invitados) va a la Landing/Invitación del evento correspondiente
-                    return redirect('/')->with('success', '¡Bienvenido a la celebración!');
-                }
+            $rol = strtolower($usuario['rol'] ?? 'anfitrion');
+
+            if ($rol === 'administrador' || $rol === 'admin') {
+                return redirect('/admin')->with('success', '¡Bienvenido, Administrador!');
+            } 
+            elseif ($rol === 'organizador' || $rol === 'anfitrion') {
+                try {
+                    $resEvento = Http::withToken($token)->timeout(5)->get('http://localhost:3000/api/eventos/mi-evento');
+                    if ($resEvento->successful() && !empty($resEvento->json())) {
+                        Session::put('evento_activo', $resEvento->json());
+                        return redirect('/eventos/dashboard')->with('success', '¡Bienvenido de vuelta!');
+                    }
+                } catch (\Exception $e) {}
+
+                Session::forget('evento_activo');
+                return redirect('/eventos/crear')->with('info', '¡Bienvenido! Crea tu primer evento para comenzar.');
+            } 
+            else {
+                return redirect('/')->with('success', '¡Bienvenido!');
             }
 
-            return redirect('/')->with('success', '¡Bienvenido!');
-
         } else {
-            $mensajeError = $response->json('mensaje') ?? 'Correo o contraseña incorrectos.';
+            $json = $response->json();
+            $mensajeError = is_array($json) 
+                ? ($json['mensaje'] ?? $json['error'] ?? $json['message'] ?? 'Correo o contraseña incorrectos.')
+                : 'Correo o contraseña incorrectos.';
+
             return back()->with('error', $mensajeError);
         }
     }
-    
 
+    // ==========================================
+    // CERRAR SESIÓN
+    // ==========================================
     public function logout()
     {
-        // Eliminamos el "ticket" de usuario y el Token de seguridad
         Session::forget('usuario_logueado');
         Session::forget('token_jwt');
+        Session::forget('evento_activo');
 
         return redirect('/login')->with('success', 'Has cerrado sesión de forma segura. ¡Hasta pronto!');
     }
@@ -112,41 +145,41 @@ class AuthController extends Controller
 
     public function updateProfile(Request $request)
     {
-        // 1. Recoger SOLO los datos básicos del formulario
         $datos = [
             'nombre' => $request->input('nombre'),
-            'correo' => $request->input('correo'),
+            'correo' => $request->input('correo') ?? $request->input('email'),
         ];
 
-        // 2. Solo sumamos la contraseña al paquete si el usuario escribió una nueva
-        if ($request->filled('contrasena')) {
-            $datos['contrasena'] = $request->input('contrasena');
+        if ($request->filled('contrasena') || $request->filled('password')) {
+            $datos['contrasena'] = $request->input('contrasena') ?? $request->input('password');
         }
 
-        // Recuperamos el usuario actual de la sesión para saber a quién estamos editando
         $usuarioLogueado = Session::get('usuario_logueado');
-        
-        // BD de MongoDB  '_id' o 'id'
-        $idUsuario = $usuarioLogueado['_id'] ?? $usuarioLogueado['id'];
+        $idUsuario = is_array($usuarioLogueado) ? ($usuarioLogueado['_id'] ?? $usuarioLogueado['id'] ?? null) : null;
 
-        // 3. Enviar la petición PUT usando el Token guardado en sesión
+        if (!$idUsuario) {
+            return back()->with('error', 'Sesión expirada. Por favor vuelve a ingresar.');
+        }
+
         $token = Session::get('token_jwt');
-        $response = Http::withToken($token)->put("http://localhost:3000/api/usuarios/{$idUsuario}", $datos);
 
-        // 4. Validar la respuesta del servidor Node.js
+        try {
+            $response = Http::withToken($token)->put("http://localhost:3000/api/usuarios/{$idUsuario}", $datos);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Error de conexión al actualizar el perfil.');
+        }
+
         if ($response->successful()) {
-            
-            // Actualizamos la sesión para que refleje los nuevos datos inmediatamente
-            $usuarioLogueado['nombre'] = $datos['nombre'];
-            $usuarioLogueado['correo'] = $datos['correo'];
-            Session::put('usuario_logueado', $usuarioLogueado);
+            if (is_array($usuarioLogueado)) {
+                $usuarioLogueado['nombre'] = $datos['nombre'];
+                $usuarioLogueado['correo'] = $datos['correo'];
+                Session::put('usuario_logueado', $usuarioLogueado);
+            }
 
             return back()->with('success', '¡Perfil actualizado con éxito!');
         } else {
             $status = $response->status();
-            $errorReal = $response->body();
-            
-            return back()->with('error', "Error del Backend (Código $status): " . $errorReal);
+            return back()->with('error', "No se pudo actualizar el perfil (Código de error: $status).");
         }
     }
 
@@ -160,45 +193,55 @@ class AuthController extends Controller
 
     public function recuperarPassword(Request $request)
     {
-        $request->validate([
-            'correo' => 'required|email'
-        ]);
+        $correo = $request->input('correo') ?? $request->input('email');
 
-        $response = Http::post('http://localhost:3000/api/usuarios/recuperar', [
-            'correo' => $request->input('correo')
-        ]);
+        if (empty($correo)) {
+            return back()->with('error', 'Por favor ingresa tu correo electrónico.');
+        }
+
+        try {
+            $response = Http::post('http://localhost:3000/api/usuarios/recuperar', [
+                'correo' => $correo,
+                'email'  => $correo
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Error al conectar con el servidor de correos.');
+        }
 
         if ($response->successful()) {
-            return back()->with('success', "¡Solicitud procesada! Si el correo es correcto, se ha generado una nueva contraseña provisoria de acceso de forma privada.");
+            return back()->with('success', "¡Solicitud procesada! Si el correo existe en el sistema, recibirás una clave provisoria.");
         } else {
-            $errorReal = $response->body(); 
-            $status = $response->status();
-            
-            return back()->with('error', "Error (Código $status): " . $errorReal);
+            return back()->with('error', "No se pudo procesar la solicitud de recuperación.");
         }
     }
 
     public function actualizarPassword(Request $request)
     {
-        $request->validate([
-            'correo' => 'required|email',
-            'contrasenaActual' => 'required',
-            'nuevaContrasena' => 'required|min:6'
-        ]);
+        $correo = $request->input('correo') ?? $request->input('email');
+        $actual = $request->input('contrasenaActual');
+        $nueva  = $request->input('nuevaContrasena');
 
-        $urlBackend = env('BACKEND_URL', 'http://localhost:3000') . '/api/usuarios/cambiar-contrasena';
-        
-        $response = Http::post($urlBackend, [
-            'correo' => $request->correo,
-            'contrasenaActual' => $request->contrasenaActual,
-            'nuevaContrasena' => $request->nuevaContrasena
-        ]);
+        if (empty($correo) || empty($actual) || empty($nueva)) {
+            return back()->with('error', 'Todos los campos son obligatorios.');
+        }
+
+        try {
+            $response = Http::post('http://localhost:3000/api/usuarios/cambiar-contrasena', [
+                'correo'           => $correo,
+                'email'            => $correo,
+                'contrasenaActual' => $actual,
+                'nuevaContrasena'  => $nueva
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Error de conexión con el servidor.');
+        }
 
         if ($response->successful()) {
             return back()->with('success', '¡Tu contraseña ha sido actualizada correctamente!');
         } else {
-            $mensajeError = $response->json('mensaje') ?? 'Error al actualizar la contraseña.';
-            return back()->with('error', $mensajeError);
+            $json = $response->json();
+            $msg = is_array($json) ? ($json['mensaje'] ?? 'Error al actualizar la contraseña.') : 'Error al actualizar la contraseña.';
+            return back()->with('error', $msg);
         }
     }
 }
