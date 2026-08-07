@@ -5,12 +5,12 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class EventController extends Controller
 {
     /**
-     * 1. INDEX: Muestra la Landing Page general de Invita App (Tu catálogo de temas)
+     * 1. INDEX: Muestra la Landing Page general de Invita App (Catálogo)
      */
     public function index()
     {
@@ -18,7 +18,7 @@ class EventController extends Controller
     }
 
     /**
-     * 2. CREATE: Redirige al formulario de creación manual de eventos si se requiere
+     * 2. CREATE: Redirige al formulario de creación manual de eventos
      */
     public function create()
     {
@@ -26,146 +26,207 @@ class EventController extends Controller
     }
 
     /**
-     * 3. STORE: Envía a Node.js la orden de crear un nuevo evento personalizado o predefinido
+     * 3. STORE: Envía a Node.js los datos formateados EXACTAMENTE como los pide Event.js
      */
     public function store(Request $request)
     {
         $token = Session::get('token_jwt');
         $usuario = Session::get('usuario_logueado');
+
+        // 🛡️ 1. Verificar sesión
+        if (!$token || !$usuario) {
+            Session::forget(['usuario_logueado', 'token_jwt', 'evento_activo']);
+            return redirect('/login')->with('error', 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+        }
+
         $idUsuario = $usuario['_id'] ?? $usuario['id'] ?? null;
 
-        $tipoEvento = $request->input('tipo_evento', 'baby_shower');
-        
-        // Mapeamos módulos automáticos según plantillas predefinidas
-        // si el usuario NO elige un evento 100% "personalizado"
+        // 🛡️ 2. Normalizar tipo_evento para encajar en el enum de Mongoose
+        $tipoInput = strtolower($request->input('tipo_evento', 'babyshower'));
+        $tipoLimpio = str_replace(['_', 'ñ', ' '], ['', 'n', ''], $tipoInput);
+
+        $enumsValidos = ['babyshower', 'matrimonio', 'asado', 'cumpleanos', 'personalizado'];
+        $tipoEvento = in_array($tipoLimpio, $enumsValidos) ? $tipoLimpio : 'personalizado';
+
+        // 🛡️ 3. Módulos activos
         $modulosPredefinidos = [
-            'baby_shower' => ['regalos', 'itinerario', 'menu'],
+            'babyshower'  => ['regalos', 'itinerario', 'menu'],
             'matrimonio'  => ['regalos', 'mesas', 'itinerario', 'menu', 'galeria'],
             'cumpleanos'  => ['itinerario', 'avisos', 'musica', 'galeria'],
-            'asado'       => ['cuotas', 'itinerario', 'insumos', 'musica'],
-            'fiesta'      => ['itinerario', 'avisos', 'musica', 'check_in'],
+            'asado'       => ['cuota', 'itinerario', 'insumos', 'musica'],
+            'personalizado' => ['itinerario', 'avisos', 'musica']
         ];
 
-        // Si es personalizado, leemos los checkboxes del front; si no, cargamos los de la plantilla
         if ($tipoEvento === 'personalizado') {
-            $modulosActivos = $request->input('modulos_activos', []); // Array de strings ['regalos', 'cuotas', etc.]
+            $modulosActivos = $request->input('modulos_activos', []);
         } else {
-            $modulosActivos = $modulosPredefinidos[$tipoEvento] ?? [];
+            $modulosActivos = $modulosPredefinidos[$tipoEvento] ?? ['itinerario'];
         }
 
+        // 🛡️ 4. Formatear Lugar y Dirección
+        $ubicacionForm = $request->input('ubicacion') ?? $request->input('lugar') ?? $request->input('direccion') ?? 'Por definir';
+        $lugar = $request->input('lugar') ?? $ubicacionForm;
+        $direccion = $request->input('direccion') ?? $ubicacionForm;
+
+        // 🛡️ 5. Generar Slug obligatorio único
+        $nombreTitulo = $request->input('titulo') ?? $request->input('nombre') ?? ('Mi ' . ucfirst($tipoEvento));
+        $slug = Str::slug($nombreTitulo . '-' . Str::random(6));
+
+        // 🛡️ 6. Payload 100% compatible con Event.js (Backend)
         $datosEvento = [
-            'creador_id'       => $idUsuario,
-            'titulo'           => $request->input('titulo'),
-            'tipo_evento'      => $tipoEvento,
-            'fecha'            => $request->input('fecha'),
-            'hora'             => $request->input('hora'),
-            'ubicacion'        => $request->input('ubicacion'),
-            'modulos_activos'  => $modulosActivos // ¡La nueva variable que espera el Backend!
+            'organizadorId'      => $idUsuario,
+            'tipo_evento'        => $tipoEvento,
+            'fecha'              => $request->input('fecha', date('Y-m-d')),
+            'hora'               => $request->input('hora', '12:00'),
+            'lugar'              => $lugar,
+            'direccion'          => $direccion,
+            'descripcion'        => $request->input('descripcion', ''),
+            'mensajeBienvenida'  => $request->input('mensaje_bienvenida', '¡Bienvenidos a mi evento!'),
+            'slug'               => $slug,
+            'estado'             => 'publicado',
+            'modulos_activos'    => $modulosActivos
         ];
 
-        $response = Http::withToken($token)->post('http://localhost:3000/api/eventos', $datosEvento);
+        try {
+            $response = Http::withToken($token)->timeout(5)->post('http://localhost:3000/api/eventos', $datosEvento);
 
-        if ($response->successful()) {
-            return redirect()->route('anfitrion.index')->with('success', '¡Tu evento ha sido creado de forma espectacular!');
+            if ($response->successful()) {
+                $eventoCreado = $response->json('evento') ?? $response->json();
+                Session::put('evento_activo', $eventoCreado);
+                
+                return redirect()->route('anfitrion.index')->with('success', '¡Tu evento ha sido creado de forma espectacular!');
+            }
+
+            if ($response->status() === 401) {
+                Session::forget(['usuario_logueado', 'token_jwt', 'evento_activo']);
+                return redirect('/login')->with('error', 'Tu sesión ha expirado. Por favor ingresa de nuevo.');
+            }
+
+            $errorMsg = $response->json('mensaje') ?? $response->json('error') ?? 'Error al guardar el evento en la base de datos.';
+            return back()->with('error', $errorMsg);
+
+        } catch (\Exception $e) {
+            return back()->with('error', 'Error al conectar con el servidor backend (Node.js).');
         }
-
-        return back()->with('error', 'No se pudo sincronizar la creación del evento en el servidor.');
     }
 
     /**
-     * 4. EDIT: Solicita a Node.js los datos de un evento específico para listarlo en el formulario de edición
+     * 4. EDIT: Carga los datos del evento para el formulario de edición
      */
     public function edit($id)
     {
         $token = Session::get('token_jwt');
-        $response = Http::withToken($token)->get("http://localhost:3000/api/eventos/{$id}");
+        
+        try {
+            $response = Http::withToken($token)->timeout(5)->get("http://localhost:3000/api/eventos/{$id}");
 
-        if ($response->successful()) {
-            $evento = $response->json('evento');
-            return view('eventos.edit', compact('evento'));
+            if ($response->successful()) {
+                $evento = $response->json('evento') ?? $response->json();
+                return view('eventos.edit', compact('evento'));
+            }
+            
+            return redirect()->route('anfitrion.index')->with('error', 'No se pudo encontrar la información del evento.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Servidor no disponible temporalmente.');
         }
-
-        return redirect()->route('anfitrion.index')->with('error', 'No se pudo encontrar la información del evento.');
     }
 
     /**
-     * 5. UPDATE: Actualiza la información estructural o visual del evento
+     * 5. UPDATE: Actualiza los parámetros del evento
      */
     public function update(Request $request, $id)
     {
         $token = Session::get('token_jwt');
 
+        $ubicacionForm = $request->input('ubicacion') ?? $request->input('lugar') ?? 'Por definir';
+
         $datosActualizar = [
-            'titulo'    => $request->input('titulo'),
             'fecha'     => $request->input('fecha'),
             'hora'      => $request->input('hora'),
-            'ubicacion' => $request->input('ubicacion'),
-            // Permite actualizar temas visuales sobre la marcha
+            'lugar'     => $request->input('lugar') ?? $ubicacionForm,
+            'direccion' => $request->input('direccion') ?? $ubicacionForm,
             'configVisual' => [
-                'colorTema'  => $request->input('color_tema'),
-                'iconoEmoji' => $request->input('icono_emoji')
+                'colorTema'  => $request->input('color_tema', '#4f46e5'),
+                'iconoEmoji' => $request->input('icono_emoji', '✨')
             ]
         ];
 
-        $response = Http::withToken($token)->put("http://localhost:3000/api/eventos/{$id}", $datosActualizar);
+        try {
+            $response = Http::withToken($token)->timeout(5)->put("http://localhost:3000/api/eventos/{$id}", $datosActualizar);
 
-        if ($response->successful()) {
-            return back()->with('success', '¡Parámetros del evento actualizados con éxito!');
+            if ($response->successful()) {
+                return back()->with('success', '¡Parámetros del evento actualizados con éxito!');
+            }
+
+            return back()->with('error', 'Error al intentar guardar los cambios.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Problemas de conexión con el servidor.');
         }
-
-        return back()->with('error', 'Error al intentar guardar los cambios del evento.');
     }
 
     /**
-     * 6. SHOW PUBLIC (RF-11 / RF-12): La joya de la corona.
-     * Renderiza la invitación dinámica que verán los invitados mediante la URL con Slug.
+     * 6. SHOW PUBLIC: Renderiza la invitación pública con Slug
      */
     public function showPublic($slug)
     {
-        // Consultamos a Node.js los detalles completos del evento mediante el slug de la URL
-        $response = Http::get("http://localhost:3000/api/eventos/publico/{$slug}");
+        try {
+            $response = Http::timeout(5)->get("http://localhost:3000/api/eventos/publico/{$slug}");
 
-        if (!$response->successful()) {
-            return redirect('/')->with('error', 'La invitación que buscas no existe o el evento ha expirado.');
+            // ⚠️ AQUÍ ESTABA EL ERROR DE SINTAXIS (Faltaba cerrar la llave del if)
+            if (!$response->successful()) {
+                // 🔍 VOLCADO DE DEPURACIÓN
+                dd([
+                    'Alerta' => 'El servidor Node.js no encontró el evento público o está oculto.',
+                    'slug_buscado'  => $slug,
+                    'status_code'   => $response->status(),
+                    'response_body' => $response->json() ?? $response->body()
+                ]);
+            } // <-- Esta es la llave que faltaba
+
+            $evento = $response->json('evento') ?? $response->json();
+            $items  = $response->json('items') ?? []; 
+
+            $estiloTema = $this->obtenerPaletaColor($evento['tipo_evento'] ?? 'babyshower');
+
+            // 🌟 Cargamos la vista mágica (en lugar de 'eventos.invitacion_publica')
+            return view('invitacion.magica', compact('evento', 'items', 'estiloTema'));
+
+        } catch (\Exception $e) {
+            dd('Error fatal de conexión con Backend:', $e->getMessage());
         }
-
-        $evento = $response->json('evento');
-        $items  = $response->json('items') ?? []; // Pueden ser regalos o ítems de cooperación (asado)
-
-        // Definimos un helper de estilos dinámicos nativos en base al tipo de evento
-        // Esto le ahorrará toneladas de código al Frontend y aplicará los colores automáticamente
-        $estiloTema = $this->obtenerPaletaColor($evento['tipo_evento'] ?? 'baby_shower');
-
-        return view('eventos.invitacion_publica', compact('evento', 'items', 'estiloTema'));
     }
-
+    
     /**
-     * 7. RESERVE ITEM: Procesa de forma abstracta la reserva de un regalo o de un insumo de cooperación
+     * 7. RESERVE ITEM: Reserva regalos o insumos
      */
     public function reserveItem(Request $request)
     {
         $itemId = $request->input('item_id');
         $nombreInvitado = $request->input('nombre_invitado');
 
-        $response = Http::post("http://localhost:3000/api/eventos/items/reservar/{$itemId}", [
-            'nombre_invitado' => $nombreInvitado
-        ]);
+        try {
+            $response = Http::timeout(5)->post("http://localhost:3000/api/eventos/items/reservar/{$itemId}", [
+                'nombre_invitado' => $nombreInvitado
+            ]);
 
-        if ($response->successful()) {
-            return back()->with('success', '¡Muchas gracias por tu valiosa colaboración en el evento!');
+            if ($response->successful()) {
+                return back()->with('success', '¡Muchas gracias por tu colaboración!');
+            }
+
+            $error = $response->json('mensaje') ?? 'Este artículo ya fue reservado.';
+            return back()->with('error', $error);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Error al procesar tu reserva.');
         }
-
-        $error = $response->json('mensaje') ?? 'Este artículo ya fue tomado o reservado por otra persona.';
-        return back()->with('error', $error);
     }
 
     /**
-     * FUNCIÓN AUXILIAR PRIVADA: Mapea configuraciones visuales según el tipo de celebración
+     * AUXILIAR: Paleta de color según el tipo de celebración
      */
     private function obtenerPaletaColor($tipo)
     {
         $temas = [
-            'baby_shower' => [
+            'babyshower' => [
                 'bg_gradient'  => 'from-blue-50 to-pink-50',
                 'color_card'   => 'bg-white text-blue-600',
                 'color_boton'  => 'bg-blue-500 hover:bg-blue-600 text-white',
@@ -189,7 +250,7 @@ class EventController extends Controller
                 'color_boton'  => 'bg-orange-600 hover:bg-orange-700 text-white',
                 'badge_color'  => 'bg-orange-100 text-orange-800'
             ],
-            'fiesta' => [
+            'personalizado' => [
                 'bg_gradient'  => 'from-slate-900 to-purple-950 text-white',
                 'color_card'   => 'bg-slate-800 text-fuchsia-400',
                 'color_boton'  => 'bg-fuchsia-600 hover:bg-fuchsia-700 text-white',
@@ -197,6 +258,6 @@ class EventController extends Controller
             ],
         ];
 
-        return $temas[$tipo] ?? $temas['baby_shower'];
+        return $temas[$tipo] ?? $temas['babyshower'];
     }
 }

@@ -11,7 +11,7 @@
         </div>
     </header>
 
-    <form action="{{ route('anfitrion.event.store') }}" method="POST" class="space-y-8">
+    <form action="{{ route('eventos.guardar') }}" method="POST" class="space-y-8">
         @csrf
 
         {{-- SECCIÓN 1: INFORMACIÓN BÁSICA DEL EVENTO --}}
@@ -32,7 +32,7 @@
                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tipo de Celebración *</label>
                     <select name="tipo_evento" id="tipo_evento" onchange="adaptarFormulario(this.value)"
                             class="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-200 transition-all bg-white text-sm font-bold text-slate-700 cursor-pointer">
-                        <option value="baby_shower" {{ old('tipo_evento') == 'baby_shower' ? 'selected' : '' }}>🍼 Baby Shower</option>
+                        <option value="babyshower" {{ old('tipo_evento') == 'babyshower' ? 'selected' : '' }}>🍼 Baby Shower</option>
                         <option value="matrimonio" {{ old('tipo_evento') == 'matrimonio' ? 'selected' : '' }}>💍 Matrimonio / Boda</option>
                         <option value="cumpleanos" {{ old('tipo_evento') == 'cumpleanos' ? 'selected' : '' }}>🎂 Cumpleaños</option>
                         <option value="asado" {{ old('tipo_evento') == 'asado' ? 'selected' : '' }}>🥩 Asado o Encuentro</option>
@@ -48,7 +48,7 @@
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Hora *</label>
-                    <input type="time" name="hora" required value="{{ old('hora') }}"
+                    <input type="time" name="hora" required value="{{ old('hora', '16:00') }}"
                            class="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-200 transition-all bg-slate-50/50 text-sm font-medium">
                 </div>
                 <div>
@@ -66,7 +66,7 @@
             <div>
                 <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Mensaje de Bienvenida (Opcional)</label>
                 <textarea name="mensaje_bienvenida" rows="2" placeholder="¡Bienvenidos a nuestra celebración! Gracias por ser parte de este momento..."
-                          class="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-200 transition-all bg-slate-50/50 text-sm font-medium">{{ old('mensaje_bienvenida') }}</textarea>
+                          class="w-full px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-200 transition-all bg-slate-50/50 text-sm font-medium resize-none">{{ old('mensaje_bienvenida') }}</textarea>
             </div>
         </div>
 
@@ -117,9 +117,9 @@
                 </label>
 
                 <label class="flex items-start p-4 bg-slate-50 rounded-2xl border border-slate-200/80 hover:border-indigo-300 cursor-pointer transition-all">
-                    <input type="checkbox" id="mod_cuotas" name="modulos_activos[]" value="cuotas" class="mt-1 text-indigo-600 rounded focus:ring-indigo-500">
+                    <input type="checkbox" id="mod_cuota" name="modulos_activos[]" value="cuota" class="mt-1 text-indigo-600 rounded focus:ring-indigo-500">
                     <span class="ml-3">
-                        <strong class="block text-slate-800 text-sm">🐮 Cuotas (La Vaca)</strong>
+                        <strong class="block text-slate-800 text-sm">🐮 Cuota (La Vaca)</strong>
                         <span class="block text-xs text-slate-400">Pozo común con datos bancarios.</span>
                     </span>
                 </label>
@@ -227,7 +227,7 @@
         const checkboxes = document.querySelectorAll('input[name="modulos_activos[]"]');
 
         // Visualización del bloque específico del bebé
-        if (tipo === 'baby_shower') {
+        if (tipo === 'babyshower') {
             seccionBabyShower.classList.remove('hidden');
         } else {
             seccionBabyShower.classList.add('hidden');
@@ -235,10 +235,10 @@
 
         // Mapeo automático de checkboxes según el tipo de plantilla elegida
         const plantillasModulos = {
-            'baby_shower': ['regalos', 'itinerario', 'menu', 'galeria', 'avisos'],
+            'babyshower': ['regalos', 'itinerario', 'menu', 'galeria', 'avisos'],
             'matrimonio':  ['regalos', 'mesas', 'itinerario', 'menu', 'galeria', 'musica', 'presupuesto'],
             'cumpleanos':  ['itinerario', 'avisos', 'musica', 'galeria', 'regalos'],
-            'asado':       ['cuotas', 'itinerario', 'insumos', 'musica', 'galeria'],
+            'asado':       ['cuota', 'itinerario', 'insumos', 'musica', 'galeria'],
             'fiesta':      ['itinerario', 'avisos', 'musica', 'checkin', 'galeria'],
             'personalizado': []
         };
