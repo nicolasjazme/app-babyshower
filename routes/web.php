@@ -57,21 +57,21 @@ Route::middleware(['auth.custom'])->group(function () {
     Route::post('/eventos/reservar-item', [EventController::class, 'reserveItem'])->name('items.reserve');
 
     // --- ACCESOS RÁPIDOS GLOBALES DE EVENTOS ---
-    Route::get('/eventos/crear', [EventController::class, 'create'])->name('eventos.crear');
-    Route::post('/eventos/guardar', [EventController::class, 'store'])->name('eventos.guardar');
+    Route::get('/eventos/crear', [EventController::class, 'create'])->name('events.create');
+    Route::post('/eventos/guardar', [EventController::class, 'store'])->name('events.store');
 
     // ========================================================
-    // 🍼 MÓDULO ANFITRIÓN: CONTROL DE SUS EVENTOS PROPIOS
+    //  MÓDULO ANFITRIÓN: CONTROL DE SUS EVENTOS PROPIOS
     // ========================================================
     Route::prefix('anfitrion')->name('anfitrion.')->group(function () {
         // Dashboard principal del organizador
         Route::get('/', [HostController::class, 'index'])->name('index');
         
         // CRUD de Eventos Dinámicos (Creación según la plantilla elegida)
-        Route::get('/eventos/nuevo', [EventController::class, 'create'])->name('event.create');
-        Route::post('/eventos/nuevo', [EventController::class, 'store'])->name('event.store');
-        Route::get('/eventos/{id}/editar', [EventController::class, 'edit'])->name('event.edit');
-        Route::put('/eventos/{id}', [EventController::class, 'update'])->name('event.update');
+        Route::get('/eventos/nuevo', [EventController::class, 'create'])->name('events.create');
+        Route::post('/eventos/nuevo', [EventController::class, 'store'])->name('events.store');
+        Route::get('/eventos/{id}/editar', [EventController::class, 'edit'])->name('events.edit');
+        Route::put('/eventos/{id}', [EventController::class, 'update'])->name('events.update');
 
         // Gestión de Invitados y Envío de Recordatorios por Evento
         Route::get('/invitados', [HostController::class, 'invitadosIndex'])->name('guests.index');
