@@ -14,77 +14,160 @@ class AdminController extends Controller
     private $backendUrlEvents = 'http://localhost:3000/api/eventos/todos';
     private $backendUrlIncidencias = 'http://localhost:3000/api/eventos/incidencias';
     private $backendUrlMetricasRegalos = 'http://localhost:3000/api/admin/metricas/regalos';
+    private $backendUrlUsuarios = 'http://localhost:3000/api/usuarios'; // Endpoint para gestionar comunidad
 
     /**
-     * Muestra el Panel de Administración con las métricas del catálogo, 
-     * las estadísticas de celebraciones, incidencias y supervisión de regalos por slug (RF-13)
-     * EXCLUSIVO: Solo Administrador
+     * Helper privado para validar de forma limpia si el usuario es Administrador
+     */
+    private function validarAdmin()
+    {
+        $usuario = Session::get('usuario_logueado');
+        return isset($usuario['rol']) && $usuario['rol'] === 'administrador';
+    }
+
+    // ========================================================
+    // 🎨 1. VISTAS DEL DASHBOARD LÚDICO (SEPARADAS Y OPTIMIZADAS)
+    // ========================================================
+
+    /**
+     * Pantalla Principal: Menú de Tarjetas Gigantes
      */
     public function index()
     {
-        // 1. Verificación de Seguridad Estricta
-        $usuario = Session::get('usuario_logueado');
-        if (!isset($usuario['rol']) || $usuario['rol'] !== 'administrador') {
-            return redirect('/')->with('error', 'No tienes permisos para acceder al panel de administración.');
-        }
+        if (!$this->validarAdmin()) return redirect('/')->with('error', 'No tienes permisos para acceder al panel de administración.');
 
         $token = Session::get('token_jwt');
-        
-        // Inicializamos variables defensivas por si falla la conexión física con NoSQL
-        $gifts = collect([]);
+        $eventos = [];
         $incidencias = [];
-        $metricasRegalos = []; 
-        $metricasEvents = [
-            'publicados' => 0,
-            'ocultos'    => 0,
-            'cerrados'   => 0
-        ];
 
         try {
-            // 2. Obtener el catálogo global de regalos sugeridos
-            $responseGifts = Http::get($this->backendUrlGifts);
-            if ($responseGifts->successful()) {
-                $gifts = collect($responseGifts->json());
-            } else {
-                session()->now('error', 'No se pudo conectar con el servidor de regalos sugeridos.');
-            }
+            // Solo consultamos conteos rápidos para las burbujas de notificaciones
+            $resEvents = Http::withToken($token)->get($this->backendUrlEvents);
+            if ($resEvents->successful()) $eventos = $resEvents->json();
 
-            if ($token) {
-                // 3. Obtener todas las celebraciones para procesar métricas globales
-                $responseEvents = Http::withToken($token)->get($this->backendUrlEvents);
-                if ($responseEvents->successful()) {
-                    $events = collect($responseEvents->json());
-                    
-                    // Contamos los estados usando los ayudantes nativos de colecciones de Laravel
-                    $metricasEvents = [
-                        'publicados' => $events->where('estado', 'publicado')->count(),
-                        'ocultos'    => $events->where('estado', 'oculto')->count(),
-                        'cerrados'   => $events->where('estado', 'cerrado')->count(),
-                    ];
-                }
-
-                // 4. Obtener tickets de soporte e incidencias abiertas en tiempo real
-                $responseIncidencias = Http::withToken($token)->get($this->backendUrlIncidencias);
-                if ($responseIncidencias->successful()) {
-                    $incidencias = $responseIncidencias->json();
-                }
-
-                // 5. Consumir las métricas de regalos asociados a cada celebración (slug)
-                $responseMetricasRegalos = Http::withToken($token)->get($this->backendUrlMetricasRegalos);
-                if ($responseMetricasRegalos->successful()) {
-                    $metricasRegalos = $responseMetricasRegalos->json();
-                } else {
-                    session()->now('error', 'No se pudo recuperar el inventario de regalos por celebración.');
-                }
-            }
-
+            $resIncidencias = Http::withToken($token)->get($this->backendUrlIncidencias);
+            if ($resIncidencias->successful()) $incidencias = $resIncidencias->json();
         } catch (Exception $e) {
-            session()->now('error', 'Fallo crítico de red: El servidor backend de Node.js está fuera de línea.');
+            // Silencioso en el index para no romper la navegación si Node tarda
         }
 
-        // Enviamos todas las estructuras unificadas de forma compacta a la vista del Admin
-        return view('admin.index', compact('gifts', 'metricasEvents', 'incidencias', 'metricasRegalos'));
+        return view('admin.index', compact('eventos', 'incidencias'));
     }
+
+    /**
+     * Tarjeta 1: Directorio de Celebraciones Activas
+     */
+    public function eventos()
+    {
+        if (!$this->validarAdmin()) return redirect('/')->with('error', 'Zona exclusiva de administración.');
+        
+        $token = Session::get('token_jwt');
+        $eventos = [];
+
+        try {
+            $response = Http::withToken($token)->get($this->backendUrlEvents);
+            if ($response->successful()) {
+                $eventos = $response->json();
+            }
+        } catch (Exception $e) {
+            Session::now('error', 'Fallo de comunicación física con el backend.');
+        }
+
+        return view('admin.eventos', compact('eventos'));
+    }
+
+    /**
+     * Tarjeta 2: Caja de Soporte e Incidencias
+     */
+    public function soporte()
+    {
+        if (!$this->validarAdmin()) return redirect('/')->with('error', 'Zona exclusiva de administración.');
+
+        $token = Session::get('token_jwt');
+        $incidencias = [];
+
+        try {
+            $response = Http::withToken($token)->get($this->backendUrlIncidencias);
+            if ($response->successful()) {
+                $incidencias = $response->json();
+            }
+        } catch (Exception $e) {
+            Session::now('error', 'Fallo de comunicación física con el backend.');
+        }
+
+        return view('admin.soporte', compact('incidencias'));
+    }
+
+    /**
+     * Tarjeta 3: Métricas Globales y Salud del Sistema
+     */
+    public function metricas()
+    {
+        if (!$this->validarAdmin()) return redirect('/')->with('error', 'Zona exclusiva de administración.');
+        
+        $token = Session::get('token_jwt');
+        
+        $gifts = collect([]);
+        $metricasEvents = ['publicados' => 0, 'ocultos' => 0, 'cerrados' => 0];
+        $metricas = ['confirmados' => 0, 'rechazados' => 0, 'pendientes' => 0];
+
+        try {
+            // Catálogo Global
+            $resGifts = Http::get($this->backendUrlGifts);
+            if ($resGifts->successful()) $gifts = collect($resGifts->json());
+
+            // Conteo de Eventos
+            $resEvents = Http::withToken($token)->get($this->backendUrlEvents);
+            if ($resEvents->successful()) {
+                $events = collect($resEvents->json());
+                $metricasEvents = [
+                    'publicados' => $events->where('estado', 'publicado')->count(),
+                    'ocultos'    => $events->where('estado', 'oculto')->count(),
+                    'cerrados'   => $events->where('estado', 'cerrado')->count(),
+                ];
+            }
+
+            // Integración Endpoint Métricas Avanzadas
+            $resMetricas = Http::withToken($token)->get($this->backendUrlMetricasRegalos);
+            if ($resMetricas->successful()) {
+                $dataNode = $resMetricas->json();
+                if(isset($dataNode['asistencias'])) {
+                    $metricas = $dataNode['asistencias'];
+                }
+            }
+        } catch (Exception $e) {
+            Session::now('error', 'Fallo de conexión con el servidor Node.js.');
+        }
+
+        return view('admin.metricas', compact('gifts', 'metricasEvents', 'metricas'));
+    }
+
+    /**
+     * Tarjeta 4: Comunidad (Directorio de Usuarios)
+     */
+    public function usuarios()
+    {
+        if (!$this->validarAdmin()) return redirect('/')->with('error', 'Zona exclusiva de administración.');
+        
+        $token = Session::get('token_jwt');
+        $usuarios = [];
+
+        try {
+            $response = Http::withToken($token)->get($this->backendUrlUsuarios);
+            if ($response->successful()) {
+                $usuarios = $response->json();
+            }
+        } catch (Exception $e) {
+            Session::now('error', 'No se pudo cargar el directorio de usuarios.');
+        }
+
+        return view('admin.usuarios', compact('usuarios'));
+    }
+
+
+    // ========================================================
+    // ⚙️ 2. MÉTODOS DE ACCIÓN (CRUD Y LÓGICA DE NEGOCIO INTACTA)
+    // ========================================================
 
     /**
      * RF-01: Añadir un nuevo regalo al catálogo general
@@ -186,67 +269,15 @@ class AdminController extends Controller
     }
 
     /**
-     * PEDIR LISTA DE TODOS LOS EVENTOS (Sincronizado con Multi-Evento)
-     * EXCLUSIVO: Solo Administrador
-     */
-    public function listEvents()
-    {
-        $usuario = Session::get('usuario_logueado');
-        if (!isset($usuario['rol']) || $usuario['rol'] !== 'administrador') {
-            return redirect('/')->with('error', 'Zona exclusiva de administración global.');
-        }
-
-        $token = Session::get('token_jwt');
-        if (!$token) return redirect('/login')->with('error', 'Sesión expirada.');
-
-        $events = [];
-
-        try {
-            $response = Http::withToken($token)->get($this->backendUrlEvents);
-            
-            if ($response->successful()) {
-                $eventosRaw = $response->json();
-                
-                foreach ($eventosRaw as $ev) {
-                    $idEvento = $ev['_id'] ?? '';
-                    // 🚀 CORREGIDO: Apunta a la ruta real de Express /api/eventos/:id/invitados
-                    $urlInvitados = "http://localhost:3000/api/eventos/{$idEvento}/invitados";
-                    
-                    $responseInvitados = Http::withToken($token)->get($urlInvitados);
-                    $ev['invitados'] = $responseInvitados->successful() ? $responseInvitados->json() : [];
-                    $events[] = $ev;
-                }
-            } else {
-                \Log::error("Error al obtener eventos desde Node: " . $response->body());
-            }
-        } catch (Exception $e) {
-            \Log::error("Fallo de comunicación: " . $e->getMessage());
-            Session::now('error', 'Fallo de comunicación física con el backend.');
-        }
-
-        return view('admin.index', compact('events'));
-    }
-
-    /**
      * Cambiar el estado de visibilidad de un evento desde la tabla de control
      */
     public function updateStatus(Request $request, $id)
     {
-        $usuario = Session::get('usuario_logueado');
-        if (!isset($usuario['rol']) || $usuario['rol'] !== 'administrador') {
-            return redirect('/')->with('error', 'No tienes autorización para alterar el estado de eventos ajenos.');
-        }
+        if (!$this->validarAdmin()) return redirect('/')->with('error', 'No tienes autorización.');
 
-        $request->validate([
-            'estado' => 'required|in:publicado,oculto,cerrado'
-        ]);
+        $request->validate(['estado' => 'required|in:publicado,oculto,cerrado']);
 
         $token = Session::get('token_jwt');
-        if (!$token) {
-            return redirect('/login')->with('error', 'Sesión expirada. Por favor vuelve a ingresar.');
-        }
-
-        // 🚀 CORREGIDO: Apunta a /api/eventos
         $response = Http::withToken($token)->put("http://localhost:3000/api/eventos/{$id}", [
             'estado' => $request->input('estado')
         ]);
@@ -263,10 +294,7 @@ class AdminController extends Controller
      */
     public function liberarRegalo(Request $request, $id)
     {
-        $usuario = Session::get('usuario_logueado');
-        if (!isset($usuario['rol']) || $usuario['rol'] !== 'administrador') {
-            return redirect('/')->with('error', 'Acceso denegado. Se requieren permisos de Admin.');
-        }
+        if (!$this->validarAdmin()) return redirect('/')->with('error', 'Acceso denegado. Se requieren permisos de Admin.');
 
         $token = Session::get('token_jwt');
 
@@ -277,15 +305,12 @@ class AdminController extends Controller
             ]);
 
             if ($response->successful()) {
-                $msgExito = $response->json('mensaje') ?? 'Reserva anulada con éxito.';
-                return back()->with('success', $msgExito);
+                return back()->with('success', $response->json('mensaje') ?? 'Reserva anulada con éxito.');
             }
-
-            $mensajeError = $response->json('mensaje') ?? 'Error al interactuar con el inventario.';
-            return back()->with('error', 'Error del Servidor: ' . $mensajeError);
+            return back()->with('error', 'Error del Servidor: ' . ($response->json('mensaje') ?? 'Error'));
 
         } catch (Exception $e) {
-            return back()->with('error', 'Fallo de comunicación física con el backend: ' . $e->getMessage());
+            return back()->with('error', 'Fallo de comunicación física con el backend.');
         }
     }
 
@@ -294,10 +319,7 @@ class AdminController extends Controller
      */
     public function completarIncidencia($id)
     {
-        $usuario = Session::get('usuario_logueado');
-        if (!isset($usuario['rol']) || $usuario['rol'] !== 'administrador') {
-            return redirect('/')->with('error', 'Acceso denegado. Se requieren privilegios de Administrador.');
-        }
+        if (!$this->validarAdmin()) return redirect('/')->with('error', 'Acceso denegado. Se requieren privilegios de Administrador.');
 
         $token = Session::get('token_jwt');
 
@@ -305,15 +327,12 @@ class AdminController extends Controller
             $response = Http::withToken($token)->delete("{$this->backendUrlIncidencias}/{$id}");
 
             if ($response->successful()) {
-                $msgExito = $response->json('mensaje') ?? 'El ticket de soporte fue resuelto y removido con éxito.';
-                return back()->with('success', $msgExito);
+                return back()->with('success', $response->json('mensaje') ?? 'El ticket de soporte fue resuelto y removido con éxito.');
             }
-
-            $mensajeError = $response->json('mensaje') ?? 'No se pudo completar la solicitud de soporte.';
-            return back()->with('error', 'Error del Servidor Backend: ' . $mensajeError);
+            return back()->with('error', 'Error del Servidor Backend: ' . ($response->json('mensaje') ?? 'No se pudo completar.'));
 
         } catch (Exception $e) {
-            return back()->with('error', 'Fallo de comunicación física con el backend: ' . $e->getMessage());
+            return back()->with('error', 'Fallo de comunicación física con el backend.');
         }
     }
 
@@ -322,26 +341,17 @@ class AdminController extends Controller
      */
     public function destruirBabyShower($id)
     {
-        $usuario = Session::get('usuario_logueado');
-        if (!isset($usuario['rol']) || $usuario['rol'] !== 'administrador') {
-            return redirect('/')->with('error', 'Acceso restringido. Se requieren permisos globales.');
-        }
+        if (!$this->validarAdmin()) return redirect('/')->with('error', 'Acceso restringido. Se requieren permisos globales.');
 
         $token = Session::get('token_jwt');
-        if (!$token) {
-            return redirect('/login')->with('error', 'Sesión expirada.');
-        }
 
         try {
-            // 🚀 CORREGIDO: Apunta a /api/eventos
             $response = Http::withToken($token)->delete("http://localhost:3000/api/eventos/{$id}");
 
             if ($response->successful()) {
                 return back()->with('success', $response->json('mensaje') ?? 'Celebración eliminada correctamente del servidor.');
             }
-
-            $msgError = $response->json('mensaje') ?? 'No se pudo procesar la eliminación.';
-            return back()->with('error', 'Fallo del Servidor NoSQL: ' . $msgError);
+            return back()->with('error', 'Fallo del Servidor NoSQL: ' . ($response->json('mensaje') ?? 'No procesado.'));
 
         } catch (\Exception $e) {
             return back()->with('error', 'Fallo crítico de red al intentar conectar con Node.js.');

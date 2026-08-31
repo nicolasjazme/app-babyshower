@@ -1,88 +1,102 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mi Perfil - App Baby Shower</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="min-h-screen p-4 font-sans text-stone-800" style="background-image: url('https://i.postimg.cc/3JjzxRK9/fondo-babyshower.png'); background-size: cover; background-attachment: fixed; background-position: center;">
+@extends('layouts.app')
 
-    <nav class="max-w-3xl mx-auto mb-8 flex justify-between items-center py-4 px-6 bg-white/50 backdrop-blur-sm rounded-2xl border border-stone-200 shadow-sm">
-        <a href="/baby-shower" class="text-[#3949AB] font-bold text-xs hover:underline transition-all flex items-center gap-1">
-            ← Volver a los regalos
-        </a>
-        <span class="text-stone-700 font-extrabold text-sm">App Baby Shower 🍼</span>
-    </nav>
+@section('contenido')
+<div class="max-w-3xl mx-auto py-8 px-4 animate-fade-in-up pb-20">
+    
+    <header class="mb-8">
+        <h1 class="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+            <span class="text-4xl">👤</span> Mi Perfil
+        </h1>
+        <p class="text-slate-500 text-sm mt-2">Actualiza tus datos personales y credenciales de acceso a Invita App.</p>
+    </header>
 
-    <div class="max-w-3xl mx-auto bg-white/80 backdrop-blur-md p-10 rounded-3xl shadow-xl border border-stone-200">
-        <div class="mb-8 border-b border-stone-200 pb-6">
-            <h1 class="text-3xl font-extrabold text-stone-800">Gestión de Perfil</h1>
-            <p class="text-stone-500 text-sm mt-1">Actualiza tus datos básicos y contraseña.</p>
+    {{-- Alertas de Éxito o Error --}}
+    @if(session('success'))
+        <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-6 py-4 rounded-2xl mb-6 text-sm font-bold flex items-center gap-2 shadow-sm">
+            <span>✅</span> {{ session('success') }}
         </div>
+    @endif
 
-        @if(session('success'))
-            <div class="bg-[#D4EFDF] border-l-4 border-[#186A3B] text-[#186A3B] px-4 py-3 rounded-2xl mb-6 text-sm font-bold">
-                ✅ {{ session('success') }}
-            </div>
-        @endif
-        @if(session('error'))
-            <div class="bg-[#FADBD8] border-l-4 border-[#7B241C] text-[#7B241C] px-4 py-3 rounded-2xl mb-6 text-sm font-bold">
-                ⚠️ {{ session('error') }}
-            </div>
-        @endif
+    @if($errors->any())
+        <div class="bg-rose-50 border border-rose-200 text-rose-700 px-6 py-4 rounded-2xl mb-6 text-sm font-bold shadow-sm">
+            <span class="mb-1 block">⚠️ Hubo un problema:</span>
+            <ul class="list-disc list-inside ml-4 font-medium">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
-        <form id="formPerfil" action="/perfil" method="POST" class="space-y-6">
+    <div class="bg-white p-8 md:p-10 rounded-[2.5rem] shadow-sm border border-slate-100 relative overflow-hidden">
+        {{-- Detalle visual de fondo --}}
+        <div class="absolute top-0 right-0 w-40 h-40 bg-indigo-50 rounded-bl-full -z-10 opacity-60"></div>
+
+        <form action="{{ route('profile.update') }}" method="POST" class="space-y-8 relative z-10">
             @csrf
-            @method('PUT') 
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label for="nombre" class="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1.5">Nombre Completo</label>
-                    <input type="text" id="nombre" name="nombre" required 
-                           value="{{ Session::get('usuario_logueado')['nombre'] ?? '' }}"
-                           class="w-full px-4 py-3 border border-stone-200 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] transition-all bg-white/60 text-sm font-medium">
-                </div>
+            @method('PUT')
 
-                <div>
-                    <label for="correo" class="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1.5">Correo Electrónico</label>
-                    <input type="email" id="correo" name="correo" required 
-                           value="{{ Session::get('usuario_logueado')['correo'] ?? '' }}"
-                           class="w-full px-4 py-3 border border-stone-200 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] transition-all bg-white/60 text-sm font-medium">
-                </div>
-            </div>
-
+            {{-- Sección: Datos Básicos --}}
             <div>
-                <label for="telefono" class="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1.5">Teléfono (Opcional)</label>
-                <input type="text" id="telefono" name="telefono" placeholder="+56 9 1234 5678"
-                       value="{{ Session::get('usuario_logueado')['telefono'] ?? '' }}"
-                       class="w-full px-4 py-3 border border-stone-200 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] transition-all bg-white/60 text-sm font-medium">
-            </div>
-
-            <div class="border-t border-stone-200 pt-6">
-                <h2 class="text-lg font-extrabold text-stone-800 mb-4">Seguridad</h2>
-                
-                <div class="mb-4">
-                    <label for="contrasenaActual" class="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1.5">Contraseña Actual</label>
-                    <input type="password" id="contrasenaActual" name="contrasenaActual" placeholder="Ingresa tu clave actual"
-                           class="w-full px-4 py-3 border border-stone-200 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] transition-all bg-white/60 text-sm">
-                </div>
-
-                <div>
-                    <label for="contrasena" class="block text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1.5">Nueva Contraseña (dejar en blanco para no cambiar)</label>
-                    <input type="password" id="contrasena" name="contrasena" placeholder="********"
-                           class="w-full px-4 py-3 border border-stone-200 rounded-2xl outline-none focus:ring-2 focus:ring-[#F8E1C6] transition-all bg-white/60 text-sm">
+                <h3 class="text-lg font-black text-slate-800 mb-5 border-b border-slate-100 pb-2">Información Personal</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Nombre Completo</label>
+                        <input type="text" name="nombre" value="{{ old('nombre', Session::get('usuario_logueado')['nombre'] ?? '') }}" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Correo Electrónico</label>
+                        <input type="email" name="correo" value="{{ old('correo', Session::get('usuario_logueado')['correo'] ?? '') }}" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm" required>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                            Teléfono <span class="text-slate-300 font-bold ml-1">(Opcional)</span>
+                        </label>
+                        <input type="text" name="telefono" value="{{ old('telefono', Session::get('usuario_logueado')['telefono'] ?? '') }}" placeholder="+56 9 1234 5678" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm">
+                    </div>
                 </div>
             </div>
 
-            <div class="flex justify-end pt-2">
-                <button type="submit" id="btnGuardar"
-                        class="bg-[#F8E1C6] hover:bg-[#EAD8C1] text-stone-900 font-extrabold py-4 px-8 rounded-2xl transition-all duration-300 uppercase tracking-wider text-xs shadow-md cursor-pointer">
-                    💾 Guardar Cambios
+            {{-- Sección: Seguridad --}}
+            <div class="pt-4">
+                <h3 class="text-lg font-black text-slate-800 mb-5 border-b border-slate-100 pb-2">Seguridad y Contraseña</h3>
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Contraseña Actual</label>
+                        <input type="password" name="password_actual" placeholder="Ingresa tu clave actual para guardar cambios" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm">
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">
+                                Nueva Contraseña <span class="text-slate-300 font-bold ml-1">(Opcional)</span>
+                            </label>
+                            <input type="password" name="password" placeholder="Mínimo 8 caracteres" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Confirmar Contraseña</label>
+                            <input type="password" name="password_confirmation" placeholder="Repítela para confirmar" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all shadow-sm">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-8 border-t border-slate-100">
+                <button type="submit" class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-4 rounded-2xl transition-all shadow-md active:scale-95 hover:-translate-y-1 w-full sm:w-auto">
+                    <i class="fa-solid fa-floppy-disk"></i> Guardar Cambios
                 </button>
             </div>
         </form>
     </div>
+</div>
 
-</body>
-</html>
+<style>
+    @keyframes fadeInUp {
+        0% { opacity: 0; transform: translateY(15px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in-up {
+        animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+</style>
+@endsection

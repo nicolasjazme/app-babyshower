@@ -22,8 +22,8 @@ use App\Http\Controllers\InvitacionController;
 Route::get('/', [EventController::class, 'index'])->name('home');
 
 // Recuperación de Contraseñas
-Route::get('/recuperar-contrasena', [AuthController::class, 'showRecuperarForm']);
-Route::post('/recuperar-contrasena', [AuthController::class, 'recuperarPassword']);
+Route::get('/recuperar', [AuthController::class, 'showRecuperarForm']);
+Route::post('/recuperar', [AuthController::class, 'recuperarPassword']);
 
 // Autenticación de Usuarios (Anfitriones y Administradores)
 Route::get('/registro', [AuthController::class, 'showRegisterForm'])->name('register');
@@ -59,14 +59,20 @@ Route::middleware(['auth.custom'])->group(function () {
     // --- ACCESOS RÁPIDOS GLOBALES DE EVENTOS ---
     Route::get('/eventos/crear', [EventController::class, 'create'])->name('events.create');
     Route::post('/eventos/guardar', [EventController::class, 'store'])->name('events.store');
+    
+    // 💡 NUEVA RUTA PARA SELECCIONAR EVENTO EN LA PESTAÑA "MIS EVENTOS"
+    Route::post('/eventos/seleccionar', [EventController::class, 'seleccionarEvento'])->name('anfitrion.seleccionar_evento');
 
     // ========================================================
-    //  MÓDULO ANFITRIÓN: CONTROL DE SUS EVENTOS PROPIOS
+    //   MÓDULO ANFITRIÓN: CONTROL DE SUS EVENTOS PROPIOS
     // ========================================================
     Route::prefix('anfitrion')->name('anfitrion.')->group(function () {
         // Dashboard principal del organizador
         Route::get('/', [HostController::class, 'index'])->name('index');
         
+        // 💡 NUEVA RUTA: Listado de todas mis celebraciones
+        Route::get('/mis-eventos', [HostController::class, 'misEventos'])->name('mis_eventos');
+
         // CRUD de Eventos Dinámicos (Creación según la plantilla elegida)
         Route::get('/eventos/nuevo', [EventController::class, 'create'])->name('events.create');
         Route::post('/eventos/nuevo', [EventController::class, 'store'])->name('events.store');
@@ -87,15 +93,20 @@ Route::middleware(['auth.custom'])->group(function () {
     });
 
 
-    // ========================================================
+  // ========================================================
     // 🖥️ MÓDULO ADMINISTRADOR: SUPERVISIÓN GLOBAL DE INVITA APP
     // ========================================================
     Route::prefix('admin')->name('admin.')->group(function () {
-        // Panel base de métricas globales
+        // 1. Panel base (Menú de Tarjetas Gigantes)
         Route::get('/', [AdminController::class, 'index'])->name('index');
         
-        // Control de cuentas y eventos creados en la plataforma
-        Route::get('/eventos', [AdminController::class, 'listEvents'])->name('events.list');
+        // 2. NUEVAS RUTAS: Vistas independientes del menú lúdico
+        Route::get('/eventos', [AdminController::class, 'eventos'])->name('eventos');
+        Route::get('/soporte', [AdminController::class, 'soporte'])->name('soporte');
+        Route::get('/metricas', [AdminController::class, 'metricas'])->name('metricas');
+        Route::get('/usuarios', [AdminController::class, 'usuarios'])->name('usuarios');
+
+        // 3. Acciones de Control (Manteniendo tus funciones intactas)
         Route::post('/eventos/{id}/estado', [AdminController::class, 'updateStatus'])->name('events.status');
 
         // CRUD Global de Artículos / Requerimientos de Plantillas (Regalos o Insumos base)
@@ -111,26 +122,26 @@ Route::middleware(['auth.custom'])->group(function () {
 
 
     // RUTAS DE MÓDULOS PREMIUM (Protegidas por middleware de sesión)
-Route::prefix('eventos/modulos')->group(function () {
-    
-    // 1. Ruta Maestra para mostrar las vistas (Regalos, Cuotas, etc.)
-    Route::get('/{modulo}', [\App\Http\Controllers\ModuloController::class, 'show'])->name('modulos.show');
+    Route::prefix('eventos/modulos')->group(function () {
+        
+        // 1. Ruta Maestra para mostrar las vistas (Regalos, Cuotas, etc.)
+        Route::get('/{modulo}', [\App\Http\Controllers\ModuloController::class, 'show'])->name('modulos.show');
 
-    // --- ACCIONES MÓDULO: REGALOS ---
-    Route::post('/regalos', [\App\Http\Controllers\ModuloController::class, 'storeRegalo']);
-    Route::delete('/regalos/{id}', [\App\Http\Controllers\ModuloController::class, 'destroyRegalo']);
+        // --- ACCIONES MÓDULO: REGALOS ---
+        Route::post('/regalos', [\App\Http\Controllers\ModuloController::class, 'storeRegalo']);
+        Route::delete('/regalos/{id}', [\App\Http\Controllers\ModuloController::class, 'destroyRegalo']);
 
-    // --- ACCIONES MÓDULO: CUOTAS (LA VACA) ---
-    Route::post('/cuotas/configurar', [\App\Http\Controllers\ModuloController::class, 'configurarCuotas']);
-    Route::put('/cuotas/pagos/{id}/aprobar', [\App\Http\Controllers\ModuloController::class, 'aprobarPago']);
-    Route::delete('/cuotas/pagos/{id}', [\App\Http\Controllers\ModuloController::class, 'rechazarPago']);
+        // --- ACCIONES MÓDULO: CUOTAS (LA VACA) ---
+        Route::post('/cuotas/configurar', [\App\Http\Controllers\ModuloController::class, 'configurarCuotas']);
+        Route::put('/cuotas/pagos/{id}/aprobar', [\App\Http\Controllers\ModuloController::class, 'aprobarPago']);
+        Route::delete('/cuotas/pagos/{id}', [\App\Http\Controllers\ModuloController::class, 'rechazarPago']);
 
-    // --- ACCIONES MÓDULO: MESAS ---
-    Route::post('/mesas', [\App\Http\Controllers\ModuloController::class, 'storeMesa']);
-    Route::delete('/mesas/{id}', [\App\Http\Controllers\ModuloController::class, 'destroyMesa']);
-    Route::put('/mesas/asignar', [\App\Http\Controllers\ModuloController::class, 'asignarMesa']);
-    Route::put('/mesas/remover', [\App\Http\Controllers\ModuloController::class, 'removerMesa']);
-    
-});
+        // --- ACCIONES MÓDULO: MESAS ---
+        Route::post('/mesas', [\App\Http\Controllers\ModuloController::class, 'storeMesa']);
+        Route::delete('/mesas/{id}', [\App\Http\Controllers\ModuloController::class, 'destroyMesa']);
+        Route::put('/mesas/asignar', [\App\Http\Controllers\ModuloController::class, 'asignarMesa']);
+        Route::put('/mesas/remover', [\App\Http\Controllers\ModuloController::class, 'removerMesa']);
+        
+    });
 
 });

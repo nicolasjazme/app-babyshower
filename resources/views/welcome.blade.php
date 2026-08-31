@@ -16,17 +16,28 @@
                     <span class="font-black text-xl tracking-tight text-slate-900">Invita App</span>
                 </div>
 
-                <div>
-                    @if(Session::has('usuario_logueado'))
-                        <a href="/admin" class="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100">
-                            Ir a mi Panel 🚀
-                        </a>
-                    @else
-                        <a href="/login" class="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors px-4 py-2">
-                            Iniciar Sesión
-                        </a>
-                    @endif
-                </div>
+                <!-- Botón de Login o Panel Dinámico -->
+<div>
+    @if(Session::has('usuario_logueado'))
+        @if(Session::get('usuario_logueado')['rol'] === 'administrador')
+            <a href="/admin" class="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100 flex items-center gap-2">
+                Panel Admin ⚙️
+            </a>
+        @elseif(Session::get('usuario_logueado')['rol'] === 'anfitrion')
+            <a href="/anfitrion" class="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100 flex items-center gap-2">
+                Mi Panel 🚀
+            </a>
+        @else
+            <a href="/perfil" class="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50 px-4 py-2 rounded-full border border-indigo-100 flex items-center gap-2">
+                Mi Perfil 👤
+            </a>
+        @endif
+    @else
+        <a href="/login" class="text-sm font-bold text-slate-600 hover:text-indigo-600 transition-colors px-4 py-2">
+            Iniciar Sesión
+        </a>
+    @endif
+</div>
             </div>
         </div>
     </nav>
